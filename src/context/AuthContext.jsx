@@ -3,6 +3,26 @@ import { supabase, mapSupabaseUser } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+async function fetchProfileRole(userId) {
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .single()
+    return data?.role || 'comercial'
+  } catch {
+    return 'comercial'
+  }
+}
+
+async function buildUser(supabaseUser) {
+  if (!supabaseUser) return null
+  const mapped = mapSupabaseUser(supabaseUser)
+  const role   = await fetchProfileRole(supabaseUser.id)
+  return { ...mapped, role }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -10,15 +30,16 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     // Recupera sessão existente ao montar
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error) setSessionError(error.message)
-      setUser(session ? mapSupabaseUser(session.user) : null)
+      setUser(await buildUser(session?.user ?? null))
       setLoading(false)
     })
 
-    // Escuta mudanças de sessão em tempo real (login, logout, refresh de token)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session ? mapSupabaseUser(session.user) : null)
+    // Escuta mudanças de sessão (login, logout — ignora refresh de token)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'TOKEN_REFRESHED') return
+      setUser(await buildUser(session?.user ?? null))
       setLoading(false)
     })
 

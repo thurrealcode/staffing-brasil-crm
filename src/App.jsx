@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { canAccess } from './lib/permissions'
 import AppLayout from './layout/AppLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -27,6 +28,13 @@ function PrivateRoute({ children }) {
   return user ? children : <Navigate to="/login" replace />
 }
 
+// Bloqueia acesso direto pela URL conforme role do usuário
+function RoleRoute({ page, children }) {
+  const { user } = useAuth()
+  if (!canAccess(user?.role, page)) return <Navigate to="/dashboard" replace />
+  return children
+}
+
 function AppRoutes() {
   const { user } = useAuth()
   return (
@@ -34,17 +42,17 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/" element={<PrivateRoute><AppLayout /></PrivateRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="prospeccao" element={<Prospeccao />} />
-        <Route path="leads" element={<Leads />} />
-        <Route path="empresas" element={<Empresas />} />
-        <Route path="candidatos" element={<Candidatos />} />
-        <Route path="pipeline" element={<Pipeline />} />
-        <Route path="agenda" element={<Agenda />} />
-        <Route path="mensagens" element={<Mensagens />} />
-        <Route path="relatorios" element={<Relatorios />} />
-        <Route path="ia" element={<IA />} />
-        <Route path="configuracoes" element={<Configuracoes />} />
+        <Route path="dashboard"     element={<RoleRoute page="dashboard">    <Dashboard />    </RoleRoute>} />
+        <Route path="prospeccao"    element={<RoleRoute page="prospeccao">   <Prospeccao />   </RoleRoute>} />
+        <Route path="leads"         element={<RoleRoute page="leads">        <Leads />        </RoleRoute>} />
+        <Route path="empresas"      element={<RoleRoute page="empresas">     <Empresas />     </RoleRoute>} />
+        <Route path="candidatos"    element={<RoleRoute page="candidatos">   <Candidatos />   </RoleRoute>} />
+        <Route path="pipeline"      element={<RoleRoute page="pipeline">     <Pipeline />     </RoleRoute>} />
+        <Route path="agenda"        element={<RoleRoute page="agenda">       <Agenda />       </RoleRoute>} />
+        <Route path="mensagens"     element={<RoleRoute page="mensagens">    <Mensagens />    </RoleRoute>} />
+        <Route path="relatorios"    element={<RoleRoute page="relatorios">   <Relatorios />   </RoleRoute>} />
+        <Route path="ia"            element={<RoleRoute page="ia">           <IA />           </RoleRoute>} />
+        <Route path="configuracoes" element={<RoleRoute page="configuracoes"><Configuracoes /></RoleRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

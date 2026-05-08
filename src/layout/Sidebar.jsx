@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import { ROLE_LABELS } from '../lib/permissions'
 import {
   LayoutDashboard, Users, Building2, UserCheck, GitBranch,
   Calendar, MessageSquare, BarChart3, Settings,
@@ -11,31 +12,31 @@ const NAV_SECTIONS = [
   {
     label: 'Principal',
     items: [
-      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['admin', 'comercial', 'recrutamento'] },
     ]
   },
   {
     label: 'Comercial',
     items: [
-      { to: '/prospeccao', icon: PhoneCall, label: 'Prospecção' },
-      { to: '/leads', icon: Users, label: 'Leads' },
-      { to: '/empresas', icon: Building2, label: 'Empresas' },
-      { to: '/pipeline', icon: GitBranch, label: 'Pipeline' },
+      { to: '/prospeccao', icon: PhoneCall,   label: 'Prospecção', roles: ['admin', 'comercial'] },
+      { to: '/leads',      icon: Users,        label: 'Leads',      roles: ['admin', 'comercial'] },
+      { to: '/empresas',   icon: Building2,    label: 'Empresas',   roles: ['admin'] },
+      { to: '/pipeline',   icon: GitBranch,    label: 'Pipeline',   roles: ['admin', 'comercial'] },
     ]
   },
   {
     label: 'Recrutamento',
     items: [
-      { to: '/candidatos', icon: UserCheck, label: 'Candidatos' },
-      { to: '/agenda', icon: Calendar, label: 'Agenda' },
+      { to: '/candidatos', icon: UserCheck, label: 'Candidatos', roles: ['admin', 'recrutamento'] },
+      { to: '/agenda',     icon: Calendar,  label: 'Agenda',     roles: ['admin', 'recrutamento'] },
     ]
   },
   {
     label: 'Comunicação',
     items: [
-      { to: '/mensagens', icon: MessageSquare, label: 'Mensagens', badge: 3 },
-      { to: '/relatorios', icon: BarChart3, label: 'Relatórios' },
-      { to: '/ia', icon: Sparkles, label: 'IA Integrada' },
+      { to: '/mensagens',  icon: MessageSquare, label: 'Mensagens',   badge: 3, roles: ['admin'] },
+      { to: '/relatorios', icon: BarChart3,     label: 'Relatórios',            roles: ['admin'] },
+      { to: '/ia',         icon: Sparkles,      label: 'IA Integrada',          roles: ['admin'] },
     ]
   },
 ]
@@ -82,7 +83,10 @@ export default function Sidebar({ collapsed, onToggle }) {
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-        {NAV_SECTIONS.map((section, si) => (
+        {NAV_SECTIONS.map((section, si) => {
+          const visibleItems = section.items.filter(item => item.roles.includes(user?.role))
+          if (visibleItems.length === 0) return null
+          return (
           <div key={section.label} style={{ marginBottom: 4 }}>
             <AnimatePresence>
               {!collapsed && (
@@ -95,7 +99,7 @@ export default function Sidebar({ collapsed, onToggle }) {
             {collapsed && si > 0 && (
               <div style={{ height: 1, background: '#1c1c20', margin: '6px 10px' }} />
             )}
-            {section.items.map(({ to, icon: Icon, label, badge }) => (
+            {visibleItems.map(({ to, icon: Icon, label, badge }) => (
               <NavLink key={to} to={to} title={collapsed ? label : undefined}
                 className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
                 style={{ position: 'relative', justifyContent: collapsed ? 'center' : 'flex-start' }}
@@ -123,7 +127,8 @@ export default function Sidebar({ collapsed, onToggle }) {
               </NavLink>
             ))}
           </div>
-        ))}
+          )
+        })}
       </nav>
 
       {/* Footer */}
@@ -143,7 +148,7 @@ export default function Sidebar({ collapsed, onToggle }) {
             {!collapsed && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#e4e4e7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name}</div>
-                <div style={{ fontSize: 10, color: '#52525b' }}>{user?.role}</div>
+                <div style={{ fontSize: 10, color: '#52525b' }}>{ROLE_LABELS[user?.role] || user?.role}</div>
               </motion.div>
             )}
           </AnimatePresence>
