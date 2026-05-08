@@ -6,9 +6,174 @@ import {
 } from 'recharts'
 import {
   TrendingUp, TrendingDown, Download, Calendar, Users, Building2,
-  UserCheck, Briefcase, Target, AlertCircle, RefreshCw
+  UserCheck, Briefcase, Target, AlertCircle, RefreshCw, Loader2
 } from 'lucide-react'
 import { fetchRelatoriosData } from '../lib/relatoriosService'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+
+// ── Exportar PDF ──────────────────────────────────────────────
+
+function exportarPDF({ periodo, kpisMap, funil, segmentos, recrutamento, totalContratados, contratadosTrend }) {
+  const doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const W    = doc.internal.pageSize.getWidth()
+  const agora = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const mesRef = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+
+  // ── Header ──
+  doc.setFillColor(15, 15, 17)
+  doc.rect(0, 0, W, 36, 'F')
+
+  doc.setFontSize(18)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(250, 250, 250)
+  doc.text('Staffing Brasil CRM', 14, 16)
+
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(160, 160, 170)
+  doc.text('Relatório de Desempenho · ' + periodo, 14, 24)
+  doc.text('Gerado em ' + agora, 14, 30)
+
+  doc.setFontSize(9)
+  doc.setTextColor(239, 68, 68)
+  doc.text('Referência: ' + mesRef, W - 14, 24, { align: 'right' })
+
+  // ── Seção 1: KPIs ──
+  let y = 46
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 30, 35)
+  doc.text('1. Indicadores-Chave (KPIs)', 14, y)
+  y += 6
+
+  const kpiRows = KPI_CONFIG.map(k => {
+    const d = kpisMap[k.key] ?? {}
+    return [k.label, String(d.valor ?? '—'), String(d.variacao ?? d.label ?? '—')]
+  })
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Indicador', 'Valor', 'Variação']],
+    body: kpiRows,
+    styles: { fontSize: 10, cellPadding: 4, textColor: [30, 30, 35] },
+    headStyles: { fillColor: [239, 68, 68], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+    alternateRowStyles: { fillColor: [248, 249, 250] },
+    columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 40, halign: 'center' }, 2: { cellWidth: 50, halign: 'center' } },
+    margin: { left: 14, right: 14 },
+  })
+
+  // ── Seção 2: Funil de Conversão ──
+  y = doc.lastAutoTable.finalY + 10
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 30, 35)
+  doc.text('2. Funil de Conversão', 14, y)
+  y += 6
+
+  const funilRows = funil.map((item, i) => {
+    const base = funil[0]?.value || 1
+    const pct  = i === 0 ? '100%' : Math.round((item.value / base) * 100) + '%'
+    return [item.name, String(item.value), pct]
+  })
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Etapa', 'Leads', '% do Topo']],
+    body: funilRows.length ? funilRows : [['Sem dados no período', '—', '—']],
+    styles: { fontSize: 10, cellPadding: 4, textColor: [30, 30, 35] },
+    headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+    alternateRowStyles: { fillColor: [248, 249, 250] },
+    columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 40, halign: 'center' }, 2: { cellWidth: 40, halign: 'center' } },
+    margin: { left: 14, right: 14 },
+  })
+
+  // ── Seção 3: Segmentos ──
+  y = doc.lastAutoTable.finalY + 10
+
+  if (y > 230) { doc.addPage(); y = 20 }
+
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 30, 35)
+  doc.text('3. Leads por Segmento', 14, y)
+  y += 6
+
+  const segRows = segmentos.map(s => [s.name, String(s.value), s.pct + '%'])
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Segmento', 'Leads', 'Participação']],
+    body: segRows.length ? segRows : [['Sem dados no período', '—', '—']],
+    styles: { fontSize: 10, cellPadding: 4, textColor: [30, 30, 35] },
+    headStyles: { fillColor: [168, 85, 247], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+    alternateRowStyles: { fillColor: [248, 249, 250] },
+    columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 40, halign: 'center' }, 2: { cellWidth: 40, halign: 'center' } },
+    margin: { left: 14, right: 14 },
+  })
+
+  // ── Seção 4: Recrutamento ──
+  y = doc.lastAutoTable.finalY + 10
+
+  if (y > 220) { doc.addPage(); y = 20 }
+
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 30, 35)
+  doc.text('4. Funil de Recrutamento', 14, y)
+  y += 6
+
+  const recrutRows = recrutamento.map(r => [
+    r.name,
+    String(r.triagem    ?? 0),
+    String(r.entrevista ?? 0),
+    String(r.aprovado   ?? 0),
+    String(r.contratado ?? 0),
+  ])
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Mês', 'Triagem', 'Entrevista', 'Aprovado', 'Contratado']],
+    body: recrutRows.length ? recrutRows : [['Sem dados', '—', '—', '—', '—']],
+    styles: { fontSize: 9, cellPadding: 3.5, textColor: [30, 30, 35] },
+    headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    alternateRowStyles: { fillColor: [248, 249, 250] },
+    columnStyles: { 0: { cellWidth: 30 } },
+    margin: { left: 14, right: 14 },
+  })
+
+  // ── Sumário final ──
+  y = doc.lastAutoTable.finalY + 10
+
+  if (y > 240) { doc.addPage(); y = 20 }
+
+  doc.setFillColor(248, 249, 250)
+  doc.roundedRect(14, y, W - 28, 22, 3, 3, 'F')
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 30, 35)
+  doc.text('Candidatos Colocados no Período', 20, y + 8)
+  doc.setFontSize(16)
+  doc.setTextColor(239, 68, 68)
+  doc.text(String(totalContratados), 20, y + 18)
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 116, 139)
+  doc.text(contratadosTrend?.label ? contratadosTrend.label + ' vs período anterior' : '', 40, y + 18)
+
+  // ── Footer em todas as páginas ──
+  const pages = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i)
+    doc.setFontSize(8)
+    doc.setTextColor(160, 160, 170)
+    doc.text('Staffing Brasil CRM · Confidencial', 14, doc.internal.pageSize.getHeight() - 8)
+    doc.text(`Página ${i} de ${pages}`, W - 14, doc.internal.pageSize.getHeight() - 8, { align: 'right' })
+  }
+
+  const nomeArquivo = `relatorio-staffing-${periodo.toLowerCase().replace(/\s+/g, '-')}.pdf`
+  doc.save(nomeArquivo)
+}
 
 // ── Constantes ────────────────────────────────────────────────
 
@@ -72,10 +237,11 @@ function ChartSkeleton({ height = 220 }) {
 // ── Componente principal ──────────────────────────────────────
 
 export default function Relatorios() {
-  const [periodo,  setPeriodo]  = useState('Últimos 3 meses')
-  const [data,     setData]     = useState(null)
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState(null)
+  const [periodo,    setPeriodo]    = useState('Últimos 3 meses')
+  const [data,       setData]       = useState(null)
+  const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState(null)
+  const [exporting,  setExporting]  = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -122,8 +288,23 @@ export default function Relatorios() {
             style={{ background: '#111113', border: '1px solid #27272a', color: '#71717a', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
-          <button className="btn-secondary" style={{ fontSize: 13 }}>
-            <Download size={13} /> Exportar PDF
+          <button
+            className="btn-secondary"
+            style={{ fontSize: 13, opacity: (loading || exporting) ? 0.6 : 1, cursor: (loading || exporting) ? 'not-allowed' : 'pointer' }}
+            disabled={loading || exporting}
+            onClick={async () => {
+              setExporting(true)
+              await new Promise(r => setTimeout(r, 50))
+              try {
+                exportarPDF({ periodo, kpisMap, funil, segmentos, recrutamento, totalContratados, contratadosTrend })
+              } finally {
+                setExporting(false)
+              }
+            }}
+          >
+            {exporting
+              ? <><Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> Gerando...</>
+              : <><Download size={13} /> Exportar PDF</>}
           </button>
         </div>
       </div>
