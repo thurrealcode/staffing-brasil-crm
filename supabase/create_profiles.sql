@@ -1,83 +1,90 @@
--- Sistema de permissões por role
--- Execute no Supabase SQL Editor
+-- =============================================================
+-- Staffing Brasil CRM — Tabela: profiles (sistema de permissões)
+-- Execute uma vez no SQL Editor do painel Supabase
+-- =============================================================
 
--- ── Tabela de perfis ─────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id         UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id    UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
-  nome       TEXT NOT NULL DEFAULT '',
-  email      TEXT NOT NULL DEFAULT '',
-  role       TEXT NOT NULL DEFAULT 'comercial'
-               CHECK (role IN ('admin', 'comercial', 'recrutamento')),
-  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+-- 1. Tabela principal
+create table if not exists public.profiles (
+  id         uuid        default gen_random_uuid() primary key,
+  user_id    uuid        references auth.users(id) on delete cascade not null unique,
+  nome       text        not null default '',
+  email      text        not null default '',
+  role       text        not null default 'comercial'
+               check (role in ('admin', 'comercial', 'recrutamento')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
--- ── RLS ──────────────────────────────────────────────────────
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+-- 2. Índice para performance
+create index if not exists profiles_user_id_idx on public.profiles(user_id);
 
-DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
-CREATE POLICY "profiles_select_own" ON public.profiles
-  FOR SELECT TO authenticated
-  USING (auth.uid() = user_id);
+-- 3. Row Level Security — cada usuário só acessa o próprio perfil
+alter table public.profiles enable row level security;
 
-DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
-CREATE POLICY "profiles_update_own" ON public.profiles
-  FOR UPDATE TO authenticated
-  USING (auth.uid() = user_id);
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own"
+  on public.profiles for select
+  to authenticated
+  using (auth.uid() = user_id);
 
--- ── Trigger: cria perfil automaticamente no signup ───────────
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
-BEGIN
-  INSERT INTO public.profiles (user_id, nome, email, role)
-  VALUES (
-    NEW.id,
-    COALESCE(
-      NEW.raw_user_meta_data->>'name',
-      NEW.raw_user_meta_data->>'full_name',
-      split_part(NEW.email, '@', 1)
+drop policy if exists "profiles_update_own" on public.profiles;
+create policy "profiles_update_own"
+  on public.profiles for update
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- 4. Trigger: atualiza updated_at automaticamente
+create or replace function public.update_profiles_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_set_updated_at on public.profiles;
+create trigger profiles_set_updated_at
+  before update on public.profiles
+  for each row execute function public.update_profiles_updated_at();
+
+-- 5. Trigger: cria perfil automaticamente ao registrar novo usuário
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer as $$
+begin
+  insert into public.profiles (user_id, nome, email, role)
+  values (
+    new.id,
+    coalesce(
+      new.raw_user_meta_data->>'name',
+      new.raw_user_meta_data->>'full_name',
+      split_part(new.email, '@', 1)
     ),
-    NEW.email,
+    new.email,
     'comercial'
   )
-  ON CONFLICT (user_id) DO NOTHING;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+  on conflict (user_id) do nothing;
+  return new;
+end;
+$$;
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
 
--- ── Trigger: atualiza updated_at ─────────────────────────────
-CREATE OR REPLACE FUNCTION public.update_profiles_updated_at()
-RETURNS trigger AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS set_profiles_updated_at ON public.profiles;
-CREATE TRIGGER set_profiles_updated_at
-  BEFORE UPDATE ON public.profiles
-  FOR EACH ROW EXECUTE FUNCTION public.update_profiles_updated_at();
-
--- ── Retroativo: cria perfil para usuários já existentes ──────
-INSERT INTO public.profiles (user_id, nome, email, role)
-SELECT
+-- 6. Retroativo: cria perfil para usuários já cadastrados
+insert into public.profiles (user_id, nome, email, role)
+select
   id,
-  COALESCE(
+  coalesce(
     raw_user_meta_data->>'name',
     raw_user_meta_data->>'full_name',
     split_part(email, '@', 1)
   ),
   email,
   'comercial'
-FROM auth.users
-ON CONFLICT (user_id) DO NOTHING;
+from auth.users
+on conflict (user_id) do nothing;
 
--- ── Para tornar um usuário admin, execute: ───────────────────
--- UPDATE public.profiles SET role = 'admin' WHERE email = 'seu@email.com';
+-- 7. Para promover um usuário a admin, execute:
+-- update public.profiles set role = 'admin' where email = 'arthur.agra1234567@email.com';
