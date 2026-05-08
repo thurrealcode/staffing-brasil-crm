@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import {
   Plus, Search, X, RefreshCw, Pencil, Trash2, AlertCircle,
   Phone, ChevronRight, Clock, CalendarDays, ArrowUpRight, Loader2,
+  LayoutList, Kanban, User, MapPin,
 } from 'lucide-react'
 import {
   fetchProspeccoes, createProspeccao, updateProspeccao, deleteProspeccao,
@@ -13,15 +15,15 @@ import { createLead } from '../lib/leadsService'
 // ── Configuração de status ────────────────────────────────────
 
 const STATUS_CONFIG = {
-  'Não ligado':          { color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.2)' },
-  'Ligado sem resposta': { color: '#64748b', bg: 'rgba(100,116,139,0.08)', border: 'rgba(100,116,139,0.2)' },
-  'Falou com secretária':{ color: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.2)'  },
-  'Falar com decisor':   { color: '#f59e0b', bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.2)'  },
-  'Interessado':         { color: '#22c55e', bg: 'rgba(34,197,94,0.08)',   border: 'rgba(34,197,94,0.2)'   },
-  'Mandar apresentação': { color: '#a855f7', bg: 'rgba(168,85,247,0.08)', border: 'rgba(168,85,247,0.2)'  },
-  'Retornar depois':     { color: '#f97316', bg: 'rgba(249,115,22,0.08)', border: 'rgba(249,115,22,0.2)'  },
-  'Virou lead':          { color: '#10b981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)'  },
-  'Descartado':          { color: '#6b7280', bg: 'rgba(107,114,128,0.08)',border: 'rgba(107,114,128,0.2)' },
+  'Não ligado':          { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.25)' },
+  'Ligado sem resposta': { color: '#64748b', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.25)' },
+  'Falou com secretária':{ color: '#3b82f6', bg: 'rgba(59,130,246,0.1)',  border: 'rgba(59,130,246,0.25)'  },
+  'Falar com decisor':   { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.25)'  },
+  'Interessado':         { color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.25)'   },
+  'Mandar apresentação': { color: '#a855f7', bg: 'rgba(168,85,247,0.1)', border: 'rgba(168,85,247,0.25)'  },
+  'Retornar depois':     { color: '#f97316', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.25)'  },
+  'Virou lead':          { color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)'  },
+  'Descartado':          { color: '#6b7280', bg: 'rgba(107,114,128,0.1)',border: 'rgba(107,114,128,0.25)' },
 }
 
 const STATUSES = Object.keys(STATUS_CONFIG)
@@ -45,6 +47,13 @@ const EMPTY_FORM = {
 function fmtDate(d) {
   if (!d) return '—'
   return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR')
+}
+
+function buildColumns(itens) {
+  return STATUSES.reduce((acc, s) => ({
+    ...acc,
+    [s]: itens.filter(p => p.status === s),
+  }), {})
 }
 
 function StatusBadge({ status }) {
@@ -84,6 +93,78 @@ function LoadingSkeleton() {
   )
 }
 
+// ── Kanban card ───────────────────────────────────────────────
+
+function KanbanCard({ prosp, index, onClick }) {
+  const cfg = STATUS_CONFIG[prosp.status] || STATUS_CONFIG['Não ligado']
+  return (
+    <Draggable draggableId={prosp.id} index={index}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          onClick={onClick}
+          style={{
+            ...provided.draggableProps.style,
+            background: snapshot.isDragging ? '#f8fafc' : '#ffffff',
+            border: snapshot.isDragging ? '1px solid #9ca3af' : '1px solid #e4e4e7',
+            borderRadius: 10,
+            padding: '12px 13px',
+            marginBottom: 8,
+            cursor: 'pointer',
+            boxShadow: snapshot.isDragging ? '0 8px 24px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.04)',
+            transition: snapshot.isDragging ? 'none' : 'border-color 0.15s, box-shadow 0.15s',
+          }}
+          onMouseEnter={e => { if (!snapshot.isDragging) { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)' } }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)' }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 8, lineHeight: 1.3 }}>{prosp.empresa}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {prosp.nomeDecisor && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <User size={10} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: '#64748b' }}>{prosp.nomeDecisor}{prosp.cargoDecisor ? ` · ${prosp.cargoDecisor}` : ''}</span>
+              </div>
+            )}
+            {prosp.cidade && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <MapPin size={10} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>{prosp.cidade}</span>
+              </div>
+            )}
+            {prosp.telefone && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Phone size={10} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>{prosp.telefone}</span>
+              </div>
+            )}
+          </div>
+          {prosp.dataProximoContato && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <CalendarDays size={10} style={{ color: cfg.color, flexShrink: 0 }} />
+              <span style={{ fontSize: 11, color: cfg.color, fontWeight: 500 }}>{fmtDate(prosp.dataProximoContato)}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </Draggable>
+  )
+}
+
+function ColumnSkeleton() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {[...Array(2)].map((_, i) => (
+        <div key={i} style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: 10, padding: '12px 13px' }}>
+          <div className="skeleton" style={{ width: '70%', height: 13, borderRadius: 4, marginBottom: 8 }} />
+          <div className="skeleton" style={{ width: '50%', height: 11, borderRadius: 3 }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Modal de formulário ───────────────────────────────────────
 
 function FormModal({ initial, saving, onClose, onSave }) {
@@ -105,7 +186,6 @@ function FormModal({ initial, saving, onClose, onSave }) {
         </div>
 
         <div style={{ padding: '22px 26px', display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '70vh', overflowY: 'auto' }}>
-          {/* Empresa */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Empresa *</label>
@@ -139,7 +219,6 @@ function FormModal({ initial, saving, onClose, onSave }) {
             </div>
           </div>
 
-          {/* Status */}
           <div>
             <label style={labelStyle}>Status</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -156,7 +235,6 @@ function FormModal({ initial, saving, onClose, onSave }) {
             </div>
           </div>
 
-          {/* Datas e ações */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={labelStyle}>Última Ligação</label>
@@ -196,25 +274,21 @@ function FormModal({ initial, saving, onClose, onSave }) {
 // ── Modal de detalhes ─────────────────────────────────────────
 
 function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) {
-  const [atividades, setAtividades]       = useState([])
-  const [loadingAtiv, setLoadingAtiv]     = useState(true)
-  const [showCall, setShowCall]           = useState(false)
-  const [callDesc, setCallDesc]           = useState('')
-  const [callStatus, setCallStatus]       = useState(prosp.status)
-  const [savingCall, setSavingCall]       = useState(false)
-  const [convertindo, setConvertindo]     = useState(false)
+  const [atividades, setAtividades]   = useState([])
+  const [loadingAtiv, setLoadingAtiv] = useState(true)
+  const [showCall, setShowCall]       = useState(false)
+  const [callDesc, setCallDesc]       = useState('')
+  const [callStatus, setCallStatus]   = useState(prosp.status)
+  const [savingCall, setSavingCall]   = useState(false)
+  const [convertindo, setConvertindo] = useState(false)
 
   const cfg = STATUS_CONFIG[prosp.status] || STATUS_CONFIG['Não ligado']
 
   const loadAtividades = useCallback(async () => {
     setLoadingAtiv(true)
-    try {
-      setAtividades(await fetchAtividades(prosp.id))
-    } catch {
-      // silent — timeline é secundária
-    } finally {
-      setLoadingAtiv(false)
-    }
+    try { setAtividades(await fetchAtividades(prosp.id)) }
+    catch { /* silent */ }
+    finally { setLoadingAtiv(false) }
   }, [prosp.id])
 
   useEffect(() => { loadAtividades() }, [loadAtividades])
@@ -245,16 +319,10 @@ function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) 
     setConvertindo(true)
     try {
       await createLead({
-        empresa:       prosp.empresa,
-        contato:       prosp.nomeDecisor,
-        whatsapp:      prosp.telefone,
-        email:         '',
-        cidade:        prosp.cidade,
-        segmento:      prosp.segmento,
-        status:        'Novo Lead',
-        ultimoContato: prosp.ultimaLigacao,
-        observacoes:   prosp.observacoes,
-        tags:          [],
+        empresa: prosp.empresa, contato: prosp.nomeDecisor, whatsapp: prosp.telefone,
+        email: '', cidade: prosp.cidade, segmento: prosp.segmento,
+        status: 'Novo Lead', ultimoContato: prosp.ultimaLigacao,
+        observacoes: prosp.observacoes, tags: [],
       })
       const updated = await updateProspeccao(prosp.id, { ...prosp, status: 'Virou lead' })
       onUpdated(updated)
@@ -267,19 +335,11 @@ function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) 
     }
   }
 
-  const infoRow = (label, value) => value ? (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <span style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</span>
-      <span style={{ fontSize: 13, color: '#0f172a' }}>{value}</span>
-    </div>
-  ) : null
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
         style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: 16, width: '100%', maxWidth: 620, maxHeight: '90vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.12)' }}>
 
-        {/* Header */}
         <div style={{ padding: '22px 26px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>{prosp.empresa}</h2>
@@ -303,8 +363,6 @@ function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) 
         </div>
 
         <div style={{ padding: '22px 26px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-          {/* Info grid */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
               { label: 'Telefone',           value: prosp.telefone },
@@ -321,9 +379,8 @@ function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) 
             ))}
           </div>
 
-          {/* Próxima ação */}
           {prosp.proximaAcao && (
-            <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '12px 14px', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '12px 14px', display: 'flex', gap: 8 }}>
               <CalendarDays size={14} style={{ color: '#f59e0b', flexShrink: 0, marginTop: 1 }} />
               <div>
                 <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Próxima Ação</div>
@@ -332,7 +389,6 @@ function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) 
             </div>
           )}
 
-          {/* Observações */}
           {prosp.observacoes && (
             <div style={{ background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 8, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Observações</div>
@@ -340,7 +396,6 @@ function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) 
             </div>
           )}
 
-          {/* Ações principais */}
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setShowCall(v => !v)}
               style={{ flex: 1, background: showCall ? 'rgba(59,130,246,0.08)' : '#f8f9fa', border: `1px solid ${showCall ? 'rgba(59,130,246,0.25)' : '#e4e4e7'}`, color: showCall ? '#3b82f6' : '#475569', padding: '10px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s' }}>
@@ -353,16 +408,13 @@ function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) 
             </button>
           </div>
 
-          {/* Form de chamada */}
           <AnimatePresence>
             {showCall && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                style={{ overflow: 'hidden' }}>
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
                 <div style={{ background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Registrar Chamada</div>
                   <textarea value={callDesc} onChange={e => setCallDesc(e.target.value)}
-                    placeholder="O que aconteceu na ligação? Ex: Falei com a secretária Maria, retornar na próxima semana..."
-                    rows={3}
+                    placeholder="O que aconteceu na ligação?" rows={3}
                     style={{ width: '100%', background: '#ffffff', border: '1px solid #d1d5db', color: '#0f172a', padding: '9px 12px', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Atualizar Status</div>
@@ -395,16 +447,13 @@ function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) 
             )}
           </AnimatePresence>
 
-          {/* Timeline */}
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Clock size={12} /> Histórico de Chamadas
             </div>
             {loadingAtiv ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="skeleton" style={{ height: 56, borderRadius: 8 }} />
-                ))}
+                {[...Array(3)].map((_, i) => <div key={i} className="skeleton" style={{ height: 56, borderRadius: 8 }} />)}
               </div>
             ) : atividades.length === 0 ? (
               <div style={{ background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 8, padding: '16px', textAlign: 'center', fontSize: 13, color: '#94a3b8' }}>
@@ -441,23 +490,31 @@ function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) 
 // ── Página principal ──────────────────────────────────────────
 
 export default function Prospeccao() {
-  const [itens,       setItens]       = useState([])
-  const [loading,     setLoading]     = useState(true)
-  const [error,       setError]       = useState('')
-  const [saving,      setSaving]      = useState(false)
-  const [deletingId,  setDeletingId]  = useState(null)
-  const [search,      setSearch]      = useState('')
-  const [filterStatus,setFilterStatus]= useState('Todos')
-  const [selected,    setSelected]    = useState(null)
-  const [formOpen,    setFormOpen]    = useState(false)
-  const [editTarget,  setEditTarget]  = useState(null)
+  const [itens,        setItens]        = useState([])
+  const [columns,      setColumns]      = useState(() => buildColumns([]))
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState('')
+  const [saving,       setSaving]       = useState(false)
+  const [deletingId,   setDeletingId]   = useState(null)
+  const [search,       setSearch]       = useState('')
+  const [filterStatus, setFilterStatus] = useState('Todos')
+  const [selected,     setSelected]     = useState(null)
+  const [formOpen,     setFormOpen]     = useState(false)
+  const [editTarget,   setEditTarget]   = useState(null)
+  const [view,         setView]         = useState('lista') // 'lista' | 'kanban'
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-    try { setItens(await fetchProspeccoes()) }
-    catch (e) { setError(e.message || 'Erro ao carregar prospecções') }
-    finally { setLoading(false) }
+    try {
+      const data = await fetchProspeccoes()
+      setItens(data)
+      setColumns(buildColumns(data))
+    } catch (e) {
+      setError(e.message || 'Erro ao carregar prospecções')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -467,11 +524,15 @@ export default function Prospeccao() {
     try {
       if (editTarget) {
         const updated = await updateProspeccao(editTarget.id, data)
-        setItens(prev => prev.map(p => p.id === updated.id ? updated : p))
+        const next = itens.map(p => p.id === updated.id ? updated : p)
+        setItens(next)
+        setColumns(buildColumns(next))
         if (selected?.id === updated.id) setSelected(updated)
       } else {
         const created = await createProspeccao(data)
-        setItens(prev => [created, ...prev])
+        const next = [created, ...itens]
+        setItens(next)
+        setColumns(buildColumns(next))
       }
       setFormOpen(false)
       setEditTarget(null)
@@ -487,7 +548,9 @@ export default function Prospeccao() {
     setDeletingId(id)
     try {
       await deleteProspeccao(id)
-      setItens(prev => prev.filter(p => p.id !== id))
+      const next = itens.filter(p => p.id !== id)
+      setItens(next)
+      setColumns(buildColumns(next))
       setSelected(null)
     } catch (e) {
       alert(e.message || 'Erro ao excluir')
@@ -503,9 +566,46 @@ export default function Prospeccao() {
   }
 
   const handleUpdated = (updated) => {
-    setItens(prev => prev.map(p => p.id === updated.id ? updated : p))
+    const next = itens.map(p => p.id === updated.id ? updated : p)
+    setItens(next)
+    setColumns(buildColumns(next))
     setSelected(updated)
   }
+
+  // ── Drag and drop (kanban) ────────────────────────────────────
+
+  const onDragEnd = async (result) => {
+    const { source, destination, draggableId } = result
+    if (!destination) return
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return
+
+    const srcCol = source.droppableId
+    const dstCol = destination.droppableId
+
+    const srcCards = [...columns[srcCol]]
+    const dstCards = srcCol === dstCol ? srcCards : [...columns[dstCol]]
+    const [moved] = srcCards.splice(source.index, 1)
+    const updatedItem = { ...moved, status: dstCol }
+    dstCards.splice(destination.index, 0, updatedItem)
+
+    const prevColumns = columns
+    const prevItens   = itens
+
+    const nextCols  = { ...columns, [srcCol]: srcCards, [dstCol]: dstCards }
+    const nextItens = itens.map(p => p.id === draggableId ? updatedItem : p)
+    setColumns(nextCols)
+    setItens(nextItens)
+
+    try {
+      await updateProspeccao(moved.id, updatedItem)
+    } catch (err) {
+      setColumns(prevColumns)
+      setItens(prevItens)
+      setError('Erro ao mover card: ' + (err.message || 'tente novamente'))
+    }
+  }
+
+  // ── Filtros (lista) ───────────────────────────────────────────
 
   const filtered = itens
     .filter(p => filterStatus === 'Todos' || p.status === filterStatus)
@@ -513,17 +613,33 @@ export default function Prospeccao() {
 
   const COLS = ['Empresa', 'Segmento', 'Decisor', 'Telefone', 'Status', 'Próximo Contato']
 
+  const btnToggle = (active) => ({
+    display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+    background: active ? '#0f172a' : '#f8f9fa',
+    border: active ? '1px solid #0f172a' : '1px solid #e4e4e7',
+    color: active ? '#ffffff' : '#64748b',
+  })
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Prospecção</h2>
           <p style={{ fontSize: 13, color: '#64748b' }}>
-            {loading ? 'Carregando...' : `${filtered.length} de ${itens.length} prospecções`}
+            {loading ? 'Carregando...' : `${itens.length} prospecção${itens.length !== 1 ? 'ões' : ''}`}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Toggle lista/kanban */}
+          <div style={{ display: 'flex', background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 8, padding: 3, gap: 2 }}>
+            <button onClick={() => setView('lista')} style={btnToggle(view === 'lista')}>
+              <LayoutList size={13} /> Lista
+            </button>
+            <button onClick={() => setView('kanban')} style={btnToggle(view === 'kanban')}>
+              <Kanban size={13} /> Kanban
+            </button>
+          </div>
           <button onClick={load} disabled={loading}
             style={{ width: 34, height: 34, background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}
             title="Atualizar">
@@ -535,125 +651,183 @@ export default function Prospeccao() {
         </div>
       </div>
 
-      {/* Error */}
       <AnimatePresence>
         {error && <ErrorBanner message={error} onRetry={load} />}
       </AnimatePresence>
 
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Search size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
-          <input placeholder="Buscar empresa, decisor, cidade..." value={search} onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', background: '#ffffff', border: '1px solid #e4e4e7', color: '#0f172a', padding: '8px 12px 8px 34px', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-        </div>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#374151', padding: '8px 14px', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}>
-          <option>Todos</option>
-          {STATUSES.map(s => <option key={s}>{s}</option>)}
-        </select>
-      </div>
-
-      {/* Tabela */}
-      {loading ? <LoadingSkeleton /> : (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-          style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #f1f5f9', background: '#f8f9fa' }}>
-                  {COLS.map(col => (
-                    <th key={col} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
-                      {col}
-                    </th>
-                  ))}
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                <AnimatePresence>
-                  {filtered.map((p, i) => {
-                    const isDeleting = deletingId === p.id
-                    return (
-                      <motion.tr key={p.id}
-                        initial={{ opacity: 0 }} animate={{ opacity: isDeleting ? 0.4 : 1 }} exit={{ opacity: 0 }}
-                        transition={{ delay: i * 0.02 }}
-                        style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.15s' }}
-                        onClick={() => setSelected(p)}
-                        onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.background = '#fafafa' }}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{p.empresa}</div>
-                          {p.cidade && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{p.cidade}</div>}
-                        </td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <span style={{ background: '#f1f5f9', border: '1px solid #e4e4e7', color: '#475569', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500 }}>{p.segmento}</span>
-                        </td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontSize: 13, color: '#374151' }}>{p.nomeDecisor || '—'}</div>
-                          {p.cargoDecisor && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{p.cargoDecisor}</div>}
-                        </td>
-                        <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748b' }}>{p.telefone || '—'}</td>
-                        <td style={{ padding: '14px 16px' }}><StatusBadge status={p.status} /></td>
-                        <td style={{ padding: '14px 16px', fontSize: 12, color: '#94a3b8' }}>{fmtDate(p.dataProximoContato)}</td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
-                            <button onClick={() => setSelected(p)}
-                              style={{ width: 30, height: 30, background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s' }}
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.color = '#0f172a' }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.color = '#64748b' }}
-                              title="Ver detalhes">
-                              <ChevronRight size={12} />
-                            </button>
-                            <button onClick={() => openEdit(p)} disabled={isDeleting}
-                              style={{ width: 30, height: 30, background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s' }}
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.color = '#0f172a' }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.color = '#64748b' }}
-                              title="Editar">
-                              <Pencil size={12} />
-                            </button>
-                            <button onClick={() => handleDelete(p.id)} disabled={isDeleting}
-                              style={{ width: 30, height: 30, background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s' }}
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; e.currentTarget.style.color = '#ef4444' }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.color = '#64748b' }}
-                              title="Excluir">
-                              {isDeleting ? <Loader2 size={12} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Trash2 size={12} />}
-                            </button>
-                          </div>
-                        </td>
-                      </motion.tr>
-                    )
-                  })}
-                </AnimatePresence>
-              </tbody>
-            </table>
-
-            {!loading && filtered.length === 0 && (
-              <div style={{ padding: 52, textAlign: 'center' }}>
-                <div style={{ width: 48, height: 48, background: '#f1f5f9', border: '1px solid #e4e4e7', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                  <Phone size={20} style={{ color: '#9ca3af' }} />
-                </div>
-                <div style={{ fontSize: 14, color: '#64748b', marginBottom: 6 }}>
-                  {itens.length === 0 ? 'Nenhuma prospecção cadastrada ainda.' : 'Nenhum resultado para esses filtros.'}
-                </div>
-                {itens.length === 0 && (
-                  <button className="btn-primary" style={{ marginTop: 12, fontSize: 13 }} onClick={() => { setEditTarget(null); setFormOpen(true) }}>
-                    <Plus size={14} /> Adicionar primeira prospecção
-                  </button>
-                )}
-              </div>
-            )}
+      {/* Filtros — só na lista */}
+      {view === 'lista' && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+            <Search size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+            <input placeholder="Buscar empresa, decisor, cidade..." value={search} onChange={e => setSearch(e.target.value)}
+              style={{ width: '100%', background: '#ffffff', border: '1px solid #e4e4e7', color: '#0f172a', padding: '8px 12px 8px 34px', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
           </div>
-        </motion.div>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#374151', padding: '8px 14px', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}>
+            <option>Todos</option>
+            {STATUSES.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* ── LISTA ────────────────────────────────────────────── */}
+      {view === 'lista' && (
+        loading ? <LoadingSkeleton /> : (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #f1f5f9', background: '#f8f9fa' }}>
+                    {COLS.map(col => (
+                      <th key={col} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{col}</th>
+                    ))}
+                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <AnimatePresence>
+                    {filtered.map((p, i) => {
+                      const isDeleting = deletingId === p.id
+                      return (
+                        <motion.tr key={p.id}
+                          initial={{ opacity: 0 }} animate={{ opacity: isDeleting ? 0.4 : 1 }} exit={{ opacity: 0 }}
+                          transition={{ delay: i * 0.02 }}
+                          style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.15s' }}
+                          onClick={() => setSelected(p)}
+                          onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.background = '#fafafa' }}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <td style={{ padding: '14px 16px' }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{p.empresa}</div>
+                            {p.cidade && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{p.cidade}</div>}
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span style={{ background: '#f1f5f9', border: '1px solid #e4e4e7', color: '#475569', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500 }}>{p.segmento}</span>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <div style={{ fontSize: 13, color: '#374151' }}>{p.nomeDecisor || '—'}</div>
+                            {p.cargoDecisor && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{p.cargoDecisor}</div>}
+                          </td>
+                          <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748b' }}>{p.telefone || '—'}</td>
+                          <td style={{ padding: '14px 16px' }}><StatusBadge status={p.status} /></td>
+                          <td style={{ padding: '14px 16px', fontSize: 12, color: '#94a3b8' }}>{fmtDate(p.dataProximoContato)}</td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                              <button onClick={() => setSelected(p)}
+                                style={{ width: 30, height: 30, background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.color = '#0f172a' }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.color = '#64748b' }}>
+                                <ChevronRight size={12} />
+                              </button>
+                              <button onClick={() => openEdit(p)} disabled={isDeleting}
+                                style={{ width: 30, height: 30, background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.color = '#0f172a' }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.color = '#64748b' }}>
+                                <Pencil size={12} />
+                              </button>
+                              <button onClick={() => handleDelete(p.id)} disabled={isDeleting}
+                                style={{ width: 30, height: 30, background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; e.currentTarget.style.color = '#ef4444' }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.color = '#64748b' }}>
+                                {isDeleting ? <Loader2 size={12} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Trash2 size={12} />}
+                              </button>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      )
+                    })}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+
+              {!loading && filtered.length === 0 && (
+                <div style={{ padding: 52, textAlign: 'center' }}>
+                  <div style={{ width: 48, height: 48, background: '#f1f5f9', border: '1px solid #e4e4e7', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                    <Phone size={20} style={{ color: '#9ca3af' }} />
+                  </div>
+                  <div style={{ fontSize: 14, color: '#64748b', marginBottom: 6 }}>
+                    {itens.length === 0 ? 'Nenhuma prospecção cadastrada ainda.' : 'Nenhum resultado para esses filtros.'}
+                  </div>
+                  {itens.length === 0 && (
+                    <button className="btn-primary" style={{ marginTop: 12, fontSize: 13 }} onClick={() => { setEditTarget(null); setFormOpen(true) }}>
+                      <Plus size={14} /> Adicionar primeira prospecção
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )
+      )}
+
+      {/* ── KANBAN ───────────────────────────────────────────── */}
+      {view === 'kanban' && (
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 12, alignItems: 'flex-start' }}>
+            {STATUSES.map(colName => {
+              const cfg   = STATUS_CONFIG[colName]
+              const cards = columns[colName] ?? []
+              return (
+                <div key={colName} style={{ flexShrink: 0, width: 240, display: 'flex', flexDirection: 'column' }}>
+                  {/* Cabeçalho da coluna */}
+                  <div style={{
+                    background: cfg.bg, border: `1px solid ${cfg.border}`,
+                    borderRadius: 10, padding: '10px 12px', marginBottom: 10,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: cfg.color, lineHeight: 1.2 }}>{colName}</span>
+                    </div>
+                    <span style={{ background: 'rgba(0,0,0,0.06)', color: '#64748b', padding: '1px 7px', borderRadius: 5, fontSize: 11, fontWeight: 700 }}>
+                      {loading ? '—' : cards.length}
+                    </span>
+                  </div>
+
+                  {/* Drop zone */}
+                  <Droppable droppableId={colName}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        style={{
+                          flex: 1, minHeight: 80,
+                          background: snapshot.isDraggingOver ? cfg.bg : 'transparent',
+                          borderRadius: 8, transition: 'background 0.15s',
+                          padding: 2,
+                        }}
+                      >
+                        {loading ? (
+                          <ColumnSkeleton />
+                        ) : (
+                          <>
+                            {cards.map((p, i) => (
+                              <KanbanCard key={p.id} prosp={p} index={i} onClick={() => setSelected(p)} />
+                            ))}
+                            {provided.placeholder}
+                            {cards.length === 0 && !loading && (
+                              <div style={{ padding: '16px 12px', textAlign: 'center', color: '#cbd5e1', fontSize: 12, border: '1px dashed #e4e4e7', borderRadius: 8 }}>
+                                Nenhuma prospecção
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+              )
+            })}
+          </div>
+        </DragDropContext>
       )}
 
       {/* Modais */}
       <AnimatePresence>
         {selected && (
-          <DetailModal
-            key="detail"
-            prosp={selected}
+          <DetailModal key="detail" prosp={selected}
             onClose={() => setSelected(null)}
             onEdit={() => openEdit(selected)}
             onDelete={() => handleDelete(selected.id)}
@@ -662,10 +836,7 @@ export default function Prospeccao() {
           />
         )}
         {formOpen && (
-          <FormModal
-            key="form"
-            initial={editTarget}
-            saving={saving}
+          <FormModal key="form" initial={editTarget} saving={saving}
             onClose={() => { setFormOpen(false); setEditTarget(null) }}
             onSave={handleSave}
           />
