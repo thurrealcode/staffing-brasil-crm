@@ -34,9 +34,9 @@ const NAV_SECTIONS = [
   {
     label: 'Comunicação',
     items: [
-      { to: '/mensagens',  icon: MessageSquare, label: 'Mensagens',   badge: 3, roles: ['admin'] },
+      { to: '/mensagens',  icon: MessageSquare, label: 'Mensagens',   badge: 3, roles: ['admin', 'comercial', 'recrutamento'] },
       { to: '/relatorios', icon: BarChart3,     label: 'Relatórios',            roles: ['admin'] },
-      { to: '/ia',         icon: Sparkles,      label: 'IA Integrada',          roles: ['admin'] },
+      { to: '/ia',         icon: Sparkles,      label: 'IA Integrada',          roles: ['admin', 'comercial', 'recrutamento'] },
     ]
   },
 ]
