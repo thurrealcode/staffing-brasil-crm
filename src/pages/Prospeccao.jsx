@@ -65,6 +65,19 @@ function StatusBadge({ status }) {
   )
 }
 
+function ResponsavelChip({ nome }) {
+  if (!nome) return null
+  const initials = nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }} title={nome}>
+      <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 7, fontWeight: 700, color: '#ef4444', lineHeight: 1 }}>{initials}</span>
+      </div>
+      <span style={{ fontSize: 11, color: '#94a3b8' }}>{nome.split(' ')[0]}</span>
+    </div>
+  )
+}
+
 function ErrorBanner({ message, onRetry }) {
   return (
     <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -144,6 +157,11 @@ function KanbanCard({ prosp, index, onClick }) {
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 5 }}>
               <CalendarDays size={10} style={{ color: cfg.color, flexShrink: 0 }} />
               <span style={{ fontSize: 11, color: cfg.color, fontWeight: 500 }}>{fmtDate(prosp.dataProximoContato)}</span>
+            </div>
+          )}
+          {prosp.responsavelNome && (
+            <div style={{ marginTop: 6, paddingTop: prosp.dataProximoContato ? 0 : 6 }}>
+              <ResponsavelChip nome={prosp.responsavelNome} />
             </div>
           )}
         </div>
@@ -371,6 +389,7 @@ function DetailModal({ prosp, onClose, onEdit, onDelete, onUpdated, deleting }) 
               { label: 'Secretária/Contato', value: prosp.contatoSecretaria },
               { label: 'Última Ligação',     value: fmtDate(prosp.ultimaLigacao) },
               { label: 'Próximo Contato',    value: fmtDate(prosp.dataProximoContato) },
+              { label: 'Responsável',        value: prosp.responsavelNome },
             ].filter(r => r.value && r.value !== '—').map(({ label, value }) => (
               <div key={label} style={{ background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 8, padding: '10px 14px' }}>
                 <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>{label}</div>
@@ -611,7 +630,7 @@ export default function Prospeccao() {
     .filter(p => filterStatus === 'Todos' || p.status === filterStatus)
     .filter(p => !search || [p.empresa, p.segmento, p.cidade, p.nomeDecisor].some(v => v?.toLowerCase().includes(search.toLowerCase())))
 
-  const COLS = ['Empresa', 'Segmento', 'Decisor', 'Telefone', 'Status', 'Próximo Contato']
+  const COLS = ['Empresa', 'Segmento', 'Decisor', 'Telefone', 'Status', 'Próximo Contato', 'Responsável']
 
   const btnToggle = (active) => ({
     display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
@@ -713,6 +732,7 @@ export default function Prospeccao() {
                           <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748b' }}>{p.telefone || '—'}</td>
                           <td style={{ padding: '14px 16px' }}><StatusBadge status={p.status} /></td>
                           <td style={{ padding: '14px 16px', fontSize: 12, color: '#94a3b8' }}>{fmtDate(p.dataProximoContato)}</td>
+                          <td style={{ padding: '14px 16px' }}><ResponsavelChip nome={p.responsavelNome} /></td>
                           <td style={{ padding: '14px 16px' }}>
                             <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                               <button onClick={() => setSelected(p)}

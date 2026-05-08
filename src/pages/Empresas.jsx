@@ -31,6 +31,19 @@ const EMPTY_EMPRESA = {
 }
 
 // ── Helpers visuais ───────────────────────────────────────────
+function ResponsavelChip({ nome }) {
+  if (!nome) return null
+  const initials = nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }} title={nome}>
+      <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 7, fontWeight: 700, color: '#ef4444', lineHeight: 1 }}>{initials}</span>
+      </div>
+      <span style={{ fontSize: 11, color: '#94a3b8' }}>{nome.split(' ')[0]}</span>
+    </div>
+  )
+}
+
 function StatusBadge({ status }) {
   const c = STATUS_CONFIG[status] || STATUS_CONFIG['Inativo']
   return (
@@ -461,7 +474,7 @@ export default function Empresas() {
 
                     {/* Card footer */}
                     <div style={{ paddingTop: 12, borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', gap: 20 }}>
+                      <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
                         <div style={{ textAlign: 'center' }}>
                           <div style={{ fontSize: 16, fontWeight: 700, color: '#ef4444' }}>{empresa.vagasAbertas}</div>
                           <div style={{ fontSize: 10, color: '#94a3b8' }}>Vagas</div>
@@ -470,6 +483,7 @@ export default function Empresas() {
                           <div style={{ fontSize: 16, fontWeight: 700, color: '#22c55e' }}>{empresa.totalContratacoes}</div>
                           <div style={{ fontSize: 10, color: '#94a3b8' }}>Contratações</div>
                         </div>
+                        <ResponsavelChip nome={empresa.responsavelNome} />
                       </div>
 
                       {/* Ações */}

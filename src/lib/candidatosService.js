@@ -4,36 +4,40 @@ import { supabase } from './supabase'
 
 function fromDB(row) {
   return {
-    id:          row.id,
-    nome:        row.nome,
-    vaga:        row.vaga,
-    empresa:     row.empresa,
-    experiencia: row.experiencia,
-    cidade:      row.cidade,
-    status:      row.status,
-    score:       row.score,
-    observacoes: row.observacoes,
-    habilidades: row.habilidades ?? [],
-    curriculo:   row.curriculo,
-    data:        row.data ?? '',
-    createdAt:   row.created_at,
-    updatedAt:   row.updated_at,
+    id:               row.id,
+    nome:             row.nome,
+    vaga:             row.vaga,
+    empresa:          row.empresa,
+    experiencia:      row.experiencia,
+    cidade:           row.cidade,
+    status:           row.status,
+    score:            row.score,
+    observacoes:      row.observacoes,
+    habilidades:      row.habilidades ?? [],
+    curriculo:        row.curriculo,
+    data:             row.data ?? '',
+    responsavelNome:  row.responsavel_nome  ?? '',
+    responsavelEmail: row.responsavel_email ?? '',
+    createdAt:        row.created_at,
+    updatedAt:        row.updated_at,
   }
 }
 
 function toDB(candidato) {
   return {
-    nome:        candidato.nome        ?? '',
-    vaga:        candidato.vaga        ?? '',
-    empresa:     candidato.empresa     ?? '',
-    experiencia: candidato.experiencia ?? '',
-    cidade:      candidato.cidade      ?? '',
-    status:      candidato.status      ?? 'Triagem',
-    score:       Number(candidato.score) || 0,
-    observacoes: candidato.observacoes ?? '',
-    habilidades: candidato.habilidades ?? [],
-    curriculo:   candidato.curriculo   ?? null,
-    data:        candidato.data        || null,
+    nome:              candidato.nome             ?? '',
+    vaga:              candidato.vaga             ?? '',
+    empresa:           candidato.empresa          ?? '',
+    experiencia:       candidato.experiencia      ?? '',
+    cidade:            candidato.cidade           ?? '',
+    status:            candidato.status           ?? 'Triagem',
+    score:             Number(candidato.score)    || 0,
+    observacoes:       candidato.observacoes      ?? '',
+    habilidades:       candidato.habilidades      ?? [],
+    curriculo:         candidato.curriculo        ?? null,
+    data:              candidato.data             || null,
+    responsavel_nome:  candidato.responsavelNome  ?? '',
+    responsavel_email: candidato.responsavelEmail ?? '',
   }
 }
 
@@ -50,11 +54,13 @@ export async function fetchCandidatos() {
 }
 
 export async function createCandidato(candidato) {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) throw new Error('Usuário não autenticado.')
+  const responsavelNome = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || ''
 
   const { data, error } = await supabase
     .from('candidatos')
-    .insert({ ...toDB(candidato), user_id: user.id })
+    .insert({ ...toDB(candidato), user_id: user.id, responsavel_nome: responsavelNome, responsavel_email: user.email || '' })
     .select()
     .single()
 

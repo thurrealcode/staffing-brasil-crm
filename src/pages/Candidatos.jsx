@@ -27,6 +27,19 @@ function curFileName(path) {
   return path.split('/').pop().replace(/^\d+_/, '')
 }
 
+function ResponsavelChip({ nome }) {
+  if (!nome) return null
+  const initials = nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }} title={nome}>
+      <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 7, fontWeight: 700, color: '#ef4444', lineHeight: 1 }}>{initials}</span>
+      </div>
+      <span style={{ fontSize: 11, color: '#94a3b8' }}>{nome.split(' ')[0]}</span>
+    </div>
+  )
+}
+
 function ScoreBar({ score }) {
   const color = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444'
   return (
@@ -592,7 +605,7 @@ export default function Candidatos() {
 
                 {/* Footer */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-                  <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                     <button onClick={() => openEdit(c)}
                       style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
                       title="Editar">
@@ -603,6 +616,7 @@ export default function Candidatos() {
                       title="Excluir">
                       {isDeleting ? <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block', fontSize: 12 }}>⟳</span> : <Trash2 size={12} />}
                     </button>
+                    <ResponsavelChip nome={c.responsavelNome} />
                   </div>
                   <span style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
                     Ver perfil <ChevronRight size={12} />

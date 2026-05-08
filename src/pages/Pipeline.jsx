@@ -45,6 +45,19 @@ const SEGMENTOS = [
 
 // ── Componentes auxiliares ────────────────────────────────────
 
+function ResponsavelChip({ nome }) {
+  if (!nome) return null
+  const initials = nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }} title={nome}>
+      <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 6, fontWeight: 700, color: '#6366f1', lineHeight: 1 }}>{initials}</span>
+      </div>
+      <span style={{ fontSize: 10, color: '#9ca3af' }}>{nome.split(' ')[0]}</span>
+    </div>
+  )
+}
+
 function ErrorBanner({ message, onRetry, onClose }) {
   return (
     <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
@@ -116,10 +129,11 @@ function KanbanCard({ lead, index, onEdit }) {
             )}
           </div>
 
-          {/* Footer: edit button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 9 }}
-            onMouseDown={e => e.stopPropagation()}  // prevent drag trigger on button area
+          {/* Footer: responsável + edit button */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 9 }}
+            onMouseDown={e => e.stopPropagation()}
           >
+            <ResponsavelChip nome={lead.responsavelNome} />
             <button
               onClick={e => { e.stopPropagation(); onEdit(lead) }}
               style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, transition: 'color 0.15s' }}

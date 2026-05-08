@@ -4,34 +4,38 @@ import { supabase } from './supabase'
 
 function fromDB(row) {
   return {
-    id:            row.id,
-    empresa:       row.empresa,
-    contato:       row.contato,
-    whatsapp:      row.whatsapp,
-    email:         row.email,
-    cidade:        row.cidade,
-    segmento:      row.segmento,
-    status:        row.status,
-    ultimoContato: row.ultimo_contato ?? '',
-    observacoes:   row.observacoes,
-    tags:          row.tags ?? [],
-    createdAt:     row.created_at,
-    updatedAt:     row.updated_at,
+    id:               row.id,
+    empresa:          row.empresa,
+    contato:          row.contato,
+    whatsapp:         row.whatsapp,
+    email:            row.email,
+    cidade:           row.cidade,
+    segmento:         row.segmento,
+    status:           row.status,
+    ultimoContato:    row.ultimo_contato ?? '',
+    observacoes:      row.observacoes,
+    tags:             row.tags ?? [],
+    responsavelNome:  row.responsavel_nome  ?? '',
+    responsavelEmail: row.responsavel_email ?? '',
+    createdAt:        row.created_at,
+    updatedAt:        row.updated_at,
   }
 }
 
 function toDB(lead) {
   return {
-    empresa:        lead.empresa      ?? '',
-    contato:        lead.contato      ?? '',
-    whatsapp:       lead.whatsapp     ?? '',
-    email:          lead.email        ?? '',
-    cidade:         lead.cidade       ?? '',
-    segmento:       lead.segmento     ?? '',
-    status:         lead.status       ?? 'Novo Lead',
-    ultimo_contato: lead.ultimoContato || null,
-    observacoes:    lead.observacoes  ?? '',
-    tags:           lead.tags         ?? [],
+    empresa:          lead.empresa          ?? '',
+    contato:          lead.contato          ?? '',
+    whatsapp:         lead.whatsapp         ?? '',
+    email:            lead.email            ?? '',
+    cidade:           lead.cidade           ?? '',
+    segmento:         lead.segmento         ?? '',
+    status:           lead.status           ?? 'Novo Lead',
+    ultimo_contato:   lead.ultimoContato    || null,
+    observacoes:      lead.observacoes      ?? '',
+    tags:             lead.tags             ?? [],
+    responsavel_nome:  lead.responsavelNome  ?? '',
+    responsavel_email: lead.responsavelEmail ?? '',
   }
 }
 
@@ -48,11 +52,13 @@ export async function fetchLeads() {
 }
 
 export async function createLead(lead) {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) throw new Error('Usuário não autenticado.')
+  const responsavelNome = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || ''
 
   const { data, error } = await supabase
     .from('leads')
-    .insert({ ...toDB(lead), user_id: user.id })
+    .insert({ ...toDB(lead), user_id: user.id, responsavel_nome: responsavelNome, responsavel_email: user.email || '' })
     .select()
     .single()
 

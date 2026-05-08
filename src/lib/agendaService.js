@@ -4,38 +4,42 @@ import { supabase } from './supabase'
 
 function fromDB(row) {
   return {
-    id:           row.id,
-    titulo:       row.titulo,
-    tipo:         row.tipo,
-    data:         row.data,
-    horario:      row.horario,
-    empresa:      row.empresa,
-    contato:      row.contato,
-    local:        row.local,
-    status:       row.status,
-    observacoes:  row.observacoes,
-    empresaId:    row.empresa_id,
-    candidatoId:  row.candidato_id,
-    leadId:       row.lead_id,
-    createdAt:    row.created_at,
-    updatedAt:    row.updated_at,
+    id:               row.id,
+    titulo:           row.titulo,
+    tipo:             row.tipo,
+    data:             row.data,
+    horario:          row.horario,
+    empresa:          row.empresa,
+    contato:          row.contato,
+    local:            row.local,
+    status:           row.status,
+    observacoes:      row.observacoes,
+    empresaId:        row.empresa_id,
+    candidatoId:      row.candidato_id,
+    leadId:           row.lead_id,
+    responsavelNome:  row.responsavel_nome  ?? '',
+    responsavelEmail: row.responsavel_email ?? '',
+    createdAt:        row.created_at,
+    updatedAt:        row.updated_at,
   }
 }
 
 function toDB(evento) {
   return {
-    titulo:       evento.titulo       ?? '',
-    tipo:         evento.tipo         ?? 'Reunião',
-    data:         evento.data,
-    horario:      evento.horario      ?? '',
-    empresa:      evento.empresa      ?? '',
-    contato:      evento.contato      ?? '',
-    local:        evento.local        ?? '',
-    status:       evento.status       ?? 'Agendado',
-    observacoes:  evento.observacoes  ?? '',
-    empresa_id:   evento.empresaId    || null,
-    candidato_id: evento.candidatoId  || null,
-    lead_id:      evento.leadId       || null,
+    titulo:            evento.titulo            ?? '',
+    tipo:              evento.tipo              ?? 'Reunião',
+    data:              evento.data,
+    horario:           evento.horario           ?? '',
+    empresa:           evento.empresa           ?? '',
+    contato:           evento.contato           ?? '',
+    local:             evento.local             ?? '',
+    status:            evento.status            ?? 'Agendado',
+    observacoes:       evento.observacoes       ?? '',
+    empresa_id:        evento.empresaId         || null,
+    candidato_id:      evento.candidatoId       || null,
+    lead_id:           evento.leadId            || null,
+    responsavel_nome:  evento.responsavelNome   ?? '',
+    responsavel_email: evento.responsavelEmail  ?? '',
   }
 }
 
@@ -53,11 +57,13 @@ export async function fetchAgenda() {
 }
 
 export async function createEvento(evento) {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) throw new Error('Usuário não autenticado.')
+  const responsavelNome = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || ''
 
   const { data, error } = await supabase
     .from('agenda')
-    .insert({ ...toDB(evento), user_id: user.id })
+    .insert({ ...toDB(evento), user_id: user.id, responsavel_nome: responsavelNome, responsavel_email: user.email || '' })
     .select()
     .single()
 
