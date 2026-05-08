@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard, Users, Building2, UserCheck, GitBranch,
   Calendar, MessageSquare, BarChart3, Settings,
-  Sparkles, ChevronLeft, ChevronRight, LogOut
+  Sparkles, ChevronLeft, ChevronRight, LogOut, PhoneCall
 } from 'lucide-react'
 
 const NAV_SECTIONS = [
@@ -17,6 +17,7 @@ const NAV_SECTIONS = [
   {
     label: 'Comercial',
     items: [
+      { to: '/prospeccao', icon: PhoneCall, label: 'Prospecção' },
       { to: '/leads', icon: Users, label: 'Leads' },
       { to: '/empresas', icon: Building2, label: 'Empresas' },
       { to: '/pipeline', icon: GitBranch, label: 'Pipeline' },

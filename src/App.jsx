@@ -12,6 +12,7 @@ import Mensagens from './pages/Mensagens'
 import Relatorios from './pages/Relatorios'
 import Configuracoes from './pages/Configuracoes'
 import IA from './pages/IA'
+import Prospeccao from './pages/Prospeccao'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -34,6 +35,7 @@ function AppRoutes() {
       <Route path="/" element={<PrivateRoute><AppLayout /></PrivateRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="prospeccao" element={<Prospeccao />} />
         <Route path="leads" element={<Leads />} />
         <Route path="empresas" element={<Empresas />} />
         <Route path="candidatos" element={<Candidatos />} />
