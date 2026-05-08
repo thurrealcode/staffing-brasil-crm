@@ -86,7 +86,8 @@ export async function deleteCandidato(id) {
 // ── Storage: Currículos ───────────────────────────────────────
 
 export async function uploadCurriculo(file) {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) throw new Error('Você precisa estar autenticado para enviar um currículo.')
   const path = `${user.id}/${Date.now()}_${file.name}`
 
   const { data, error } = await supabase.storage
