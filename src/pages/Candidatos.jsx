@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Upload, X, Brain, ChevronRight, Award, MapPin, Briefcase, RefreshCw, Pencil, Trash2, AlertCircle } from 'lucide-react'
-import { fetchCandidatos, createCandidato, updateCandidato, deleteCandidato } from '../lib/candidatosService'
+import { Plus, Search, X, Brain, ChevronRight, Award, MapPin, Briefcase, RefreshCw, Pencil, Trash2, AlertCircle, Eye, Download, FileText } from 'lucide-react'
+import { fetchCandidatos, createCandidato, updateCandidato, deleteCandidato, uploadCurriculo, getCurriculoUrl } from '../lib/candidatosService'
 
 const STATUS_CONFIG = {
   'Triagem':           { color: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.2)' },
@@ -12,22 +12,20 @@ const STATUS_CONFIG = {
   'Reprovado':         { color: '#6b7280', bg: 'rgba(107,114,128,0.08)',border: 'rgba(107,114,128,0.2)' },
 }
 
-const NIVEL_CONFIG = {
-  'Junior': { color: '#64748b' },
-  'Pleno':  { color: '#3b82f6' },
-  'Sênior': { color: '#22c55e' },
-}
-
 const AI_PARECERES = [
   'Candidato com perfil técnico sólido. Experiência comprovada nas tecnologias exigidas. Comunicação clara durante triagem. Alta compatibilidade com a cultura organizacional. Recomendo avançar para entrevista técnica.',
   'Profissional com histórico consistente. Certificações relevantes e projetos de impacto. Perfil colaborativo e orientado a resultados. Compatibilidade estimada em 88% com a vaga.',
   'Candidato demonstra profundo conhecimento técnico. Background em empresas de médio e grande porte. Disponibilidade imediata. Recomendado para fase final de seleção.',
 ]
 
-const NIVEIS   = ['Junior', 'Pleno', 'Sênior']
 const STATUSES = Object.keys(STATUS_CONFIG)
 
 // ── Utilitários ───────────────────────────────────────────────
+
+function curFileName(path) {
+  if (!path) return ''
+  return path.split('/').pop().replace(/^\d+_/, '')
+}
 
 function ScoreBar({ score }) {
   const color = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444'
@@ -72,7 +70,6 @@ function LoadingSkeleton() {
           <div style={{ display: 'flex', gap: 10 }}>
             <div className="skeleton" style={{ width: 60, height: 11, borderRadius: 4 }} />
             <div className="skeleton" style={{ width: 70, height: 11, borderRadius: 4 }} />
-            <div className="skeleton" style={{ width: 80, height: 11, borderRadius: 4 }} />
           </div>
         </div>
       ))}
@@ -85,6 +82,7 @@ function LoadingSkeleton() {
 function CandidatoViewModal({ candidato, onClose, onEdit, onDelete, deleting }) {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiText, setAiText] = useState('')
+  const [curLoading, setCurLoading] = useState(null)
 
   const generateAI = async () => {
     setAiLoading(true)
@@ -94,8 +92,26 @@ function CandidatoViewModal({ candidato, onClose, onEdit, onDelete, deleting }) 
     setAiLoading(false)
   }
 
-  const cfg       = STATUS_CONFIG[candidato.status] || STATUS_CONFIG['Triagem']
-  const nivelColor = NIVEL_CONFIG[candidato.nivel]?.color || '#64748b'
+  const handleCurriculo = async (action) => {
+    setCurLoading(action)
+    try {
+      const url = await getCurriculoUrl(candidato.curriculo)
+      if (action === 'view') {
+        window.open(url, '_blank')
+      } else {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = curFileName(candidato.curriculo)
+        a.click()
+      }
+    } catch (err) {
+      alert('Erro ao acessar currículo: ' + err.message)
+    } finally {
+      setCurLoading(null)
+    }
+  }
+
+  const cfg = STATUS_CONFIG[candidato.status] || STATUS_CONFIG['Triagem']
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -126,7 +142,6 @@ function CandidatoViewModal({ candidato, onClose, onEdit, onDelete, deleting }) 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
               { label: 'Status',      value: <span style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>{candidato.status}</span> },
-              { label: 'Nível',       value: <span style={{ color: nivelColor, fontWeight: 600, fontSize: 13 }}>{candidato.nivel}</span> },
               { label: 'Experiência', value: candidato.experiencia },
               { label: 'Cidade',      value: candidato.cidade },
             ].map(({ label, value }) => (
@@ -184,14 +199,29 @@ function CandidatoViewModal({ candidato, onClose, onEdit, onDelete, deleting }) 
           </div>
 
           {/* Currículo */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button style={{ flex: 1, background: '#f8f9fa', border: '1px solid #e4e4e7', color: '#475569', padding: '10px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <Upload size={14} /> Upload Currículo
-            </button>
-            {candidato.curriculo && (
-              <button style={{ flex: 1, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6', padding: '10px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <Briefcase size={14} /> {candidato.curriculo}
-              </button>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Currículo</div>
+            {candidato.curriculo ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 8 }}>
+                  <FileText size={13} style={{ color: '#64748b', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{curFileName(candidato.curriculo)}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => handleCurriculo('view')} disabled={!!curLoading}
+                    style={{ flex: 1, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6', padding: '10px 16px', borderRadius: 8, fontSize: 13, cursor: curLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: curLoading && curLoading !== 'view' ? 0.5 : 1 }}>
+                    {curLoading === 'view' ? <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> : <Eye size={14} />} Visualizar
+                  </button>
+                  <button onClick={() => handleCurriculo('download')} disabled={!!curLoading}
+                    style={{ flex: 1, background: '#f8f9fa', border: '1px solid #e4e4e7', color: '#475569', padding: '10px 16px', borderRadius: 8, fontSize: 13, cursor: curLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: curLoading && curLoading !== 'download' ? 0.5 : 1 }}>
+                    {curLoading === 'download' ? <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> : <Download size={14} />} Download
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <FileText size={14} /> Nenhum currículo anexado
+              </div>
             )}
           </div>
         </div>
@@ -202,7 +232,9 @@ function CandidatoViewModal({ candidato, onClose, onEdit, onDelete, deleting }) 
 
 // ── Modal de formulário (criar / editar) ──────────────────────
 
-const EMPTY_FORM = { nome: '', vaga: '', empresa: '', experiencia: '', cidade: '', nivel: 'Pleno', status: 'Triagem', score: 0, observacoes: '', habilidades: '', curriculo: '', data: '' }
+const EMPTY_FORM = { nome: '', vaga: '', empresa: '', experiencia: '', cidade: '', status: 'Triagem', score: 0, observacoes: '', habilidades: '', curriculo: null, data: '' }
+
+const ACCEPTED_TYPES = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
 
 function CandidatoFormModal({ initial, onClose, onSave, saving }) {
   const isEdit = !!initial?.id
@@ -211,21 +243,60 @@ function CandidatoFormModal({ initial, onClose, onSave, saving }) {
       ? { ...initial, habilidades: (initial.habilidades ?? []).join(', ') }
       : EMPTY_FORM
   )
+  const [curFile, setCurFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef(null)
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
-  const handleSubmit = e => {
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      alert('Tipo não suportado. Use PDF, DOC ou DOCX.')
+      e.target.value = ''
+      return
+    }
+    setCurFile(file)
+  }
+
+  const clearFile = () => {
+    setCurFile(null)
+    set('curriculo', null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  const handleSubmit = async e => {
     e.preventDefault()
     if (!form.nome.trim()) return
+
+    let curriculo = form.curriculo
+    if (curFile) {
+      setUploading(true)
+      try {
+        curriculo = await uploadCurriculo(curFile)
+      } catch (err) {
+        alert('Erro ao enviar currículo: ' + err.message)
+        setUploading(false)
+        return
+      }
+      setUploading(false)
+    }
+
     onSave({
       ...form,
       score:       Number(form.score) || 0,
       habilidades: form.habilidades.split(',').map(s => s.trim()).filter(Boolean),
+      curriculo,
     })
   }
 
+  const isBusy = saving || uploading
   const inputStyle = { width: '100%', background: '#ffffff', border: '1px solid #d1d5db', color: '#0f172a', padding: '9px 12px', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }
   const labelStyle = { fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5, display: 'block' }
+
+  const hasExistingFile = !!form.curriculo && !curFile
+  const fileLabel = curFile ? curFile.name : hasExistingFile ? curFileName(form.curriculo) : 'Selecionar PDF, DOC ou DOCX'
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, overflowY: 'auto' }}>
@@ -260,12 +331,6 @@ function CandidatoFormModal({ initial, onClose, onSave, saving }) {
               <input value={form.cidade} onChange={e => set('cidade', e.target.value)} placeholder="Cidade" style={inputStyle} />
             </div>
             <div>
-              <label style={labelStyle}>Nível</label>
-              <select value={form.nivel} onChange={e => set('nivel', e.target.value)} style={inputStyle}>
-                {NIVEIS.map(n => <option key={n}>{n}</option>)}
-              </select>
-            </div>
-            <div>
               <label style={labelStyle}>Status</label>
               <select value={form.status} onChange={e => set('status', e.target.value)} style={inputStyle}>
                 {STATUSES.map(s => <option key={s}>{s}</option>)}
@@ -283,10 +348,29 @@ function CandidatoFormModal({ initial, onClose, onSave, saving }) {
               <label style={labelStyle}>Habilidades (separadas por vírgula)</label>
               <input value={form.habilidades} onChange={e => set('habilidades', e.target.value)} placeholder="React, TypeScript, Node.js" style={inputStyle} />
             </div>
+
+            {/* Currículo upload */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Currículo (nome do arquivo)</label>
-              <input value={form.curriculo} onChange={e => set('curriculo', e.target.value)} placeholder="curriculo.pdf" style={inputStyle} />
+              <label style={labelStyle}>Currículo</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label htmlFor="curriculo-upload"
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: '#ffffff', border: '1px solid #d1d5db', borderRadius: 8, padding: '9px 12px', cursor: 'pointer', fontSize: 13, color: (curFile || hasExistingFile) ? '#0f172a' : '#9ca3af', overflow: 'hidden' }}>
+                  <FileText size={14} style={{ color: '#64748b', flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileLabel}</span>
+                  <input ref={fileRef} id="curriculo-upload" type="file" accept=".pdf,.doc,.docx" onChange={handleFileChange} style={{ display: 'none' }} />
+                </label>
+                {(curFile || hasExistingFile) && (
+                  <button type="button" onClick={clearFile}
+                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4, flexShrink: 0 }}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              {hasExistingFile && (
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>Arquivo atual. Selecione outro para substituir.</div>
+              )}
             </div>
+
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Observações</label>
               <textarea value={form.observacoes} onChange={e => set('observacoes', e.target.value)} placeholder="Notas sobre o candidato..." rows={3}
@@ -299,9 +383,13 @@ function CandidatoFormModal({ initial, onClose, onSave, saving }) {
               style={{ flex: 1, background: '#f8f9fa', border: '1px solid #e4e4e7', color: '#475569', padding: '10px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
               Cancelar
             </button>
-            <button type="submit" disabled={saving}
-              style={{ flex: 1, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', color: '#fff', padding: '10px 16px', borderRadius: 8, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving ? 0.7 : 1 }}>
-              {saving ? <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> Salvando...</> : (isEdit ? 'Salvar Alterações' : 'Adicionar Candidato')}
+            <button type="submit" disabled={isBusy}
+              style={{ flex: 1, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', color: '#fff', padding: '10px 16px', borderRadius: 8, fontSize: 13, cursor: isBusy ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: isBusy ? 0.7 : 1 }}>
+              {uploading
+                ? <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> Enviando currículo...</>
+                : saving
+                  ? <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> Salvando...</>
+                  : (isEdit ? 'Salvar Alterações' : 'Adicionar Candidato')}
             </button>
           </div>
         </form>
@@ -446,7 +534,6 @@ export default function Candidatos() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
           {filtered.map((c, i) => {
             const cfg = STATUS_CONFIG[c.status] || STATUS_CONFIG['Triagem']
-            const nivelColor = NIVEL_CONFIG[c.nivel]?.color || '#64748b'
             const isDeleting = deletingId === c.id
             return (
               <motion.div key={c.id}
@@ -471,10 +558,6 @@ export default function Candidatos() {
 
                 {/* Info */}
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Award size={11} style={{ color: nivelColor }} />
-                    <span style={{ fontSize: 11, color: nivelColor, fontWeight: 600 }}>{c.nivel}</span>
-                  </div>
                   {c.experiencia && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Briefcase size={11} style={{ color: '#94a3b8' }} />
@@ -485,6 +568,12 @@ export default function Candidatos() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <MapPin size={11} style={{ color: '#94a3b8' }} />
                       <span style={{ fontSize: 11, color: '#64748b' }}>{c.cidade}</span>
+                    </div>
+                  )}
+                  {c.curriculo && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <FileText size={11} style={{ color: '#94a3b8' }} />
+                      <span style={{ fontSize: 11, color: '#64748b' }}>Currículo</span>
                     </div>
                   )}
                 </div>

@@ -10,7 +10,6 @@ function fromDB(row) {
     empresa:     row.empresa,
     experiencia: row.experiencia,
     cidade:      row.cidade,
-    nivel:       row.nivel,
     status:      row.status,
     score:       row.score,
     observacoes: row.observacoes,
@@ -29,12 +28,11 @@ function toDB(candidato) {
     empresa:     candidato.empresa     ?? '',
     experiencia: candidato.experiencia ?? '',
     cidade:      candidato.cidade      ?? '',
-    nivel:       candidato.nivel       ?? 'Pleno',
     status:      candidato.status      ?? 'Triagem',
     score:       Number(candidato.score) || 0,
     observacoes: candidato.observacoes ?? '',
     habilidades: candidato.habilidades ?? [],
-    curriculo:   candidato.curriculo   ?? '',
+    curriculo:   candidato.curriculo   ?? null,
     data:        candidato.data        || null,
   }
 }
@@ -83,4 +81,27 @@ export async function deleteCandidato(id) {
     .eq('id', id)
 
   if (error) throw error
+}
+
+// ── Storage: Currículos ───────────────────────────────────────
+
+export async function uploadCurriculo(file) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const path = `${user.id}/${Date.now()}_${file.name}`
+
+  const { data, error } = await supabase.storage
+    .from('curriculos')
+    .upload(path, file, { upsert: false, contentType: file.type })
+
+  if (error) throw error
+  return data.path
+}
+
+export async function getCurriculoUrl(path) {
+  const { data, error } = await supabase.storage
+    .from('curriculos')
+    .createSignedUrl(path, 3600)
+
+  if (error) throw error
+  return data.signedUrl
 }
