@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { notifyAdmins } from './notificationsService'
 
 // ── Mapeamento DB (snake_case) ↔ App (camelCase) ──────────────
 
@@ -68,6 +69,7 @@ export async function createEvento(evento) {
     .single()
 
   if (error) throw error
+  notifyAdmins({ type: 'agenda', content: `Novo evento: ${evento.titulo}`, link: '/agenda', excludeUserId: user.id })
   return fromDB(data)
 }
 

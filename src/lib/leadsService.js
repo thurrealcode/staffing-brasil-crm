@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { notifyAdmins } from './notificationsService'
 
 // ── Mapeamento DB (snake_case) ↔ App (camelCase) ──────────────
 
@@ -63,6 +64,7 @@ export async function createLead(lead) {
     .single()
 
   if (error) throw error
+  notifyAdmins({ type: 'lead', content: `Novo lead: ${lead.empresa || lead.contato}`, link: '/leads', excludeUserId: user.id })
   return fromDB(data)
 }
 
