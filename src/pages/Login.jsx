@@ -7,6 +7,66 @@ import { useAuth } from '../context/AuthContext'
 // 'login' | 'register' | 'reset' | 'confirmed'
 const MODES = { LOGIN: 'login', REGISTER: 'register', RESET: 'reset', CONFIRMED: 'confirmed' }
 
+const inputBaseStyle = {
+  width: '100%', background: '#18181b', border: '1px solid #27272a',
+  color: '#fafafa', padding: '10px 14px', borderRadius: 8,
+  fontSize: 14, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+  transition: 'border-color 0.2s, box-shadow 0.2s',
+}
+const inputWithIconStyle = { ...inputBaseStyle, paddingLeft: 36 }
+
+function Field({ icon: Icon, type = 'text', value, onChange, placeholder, autoComplete, rightSlot }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <Icon size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#52525b', pointerEvents: 'none' }} />
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        autoComplete={autoComplete} required
+        style={{ ...inputWithIconStyle, paddingRight: rightSlot ? 40 : 14 }}
+        onFocus={e => { e.target.style.borderColor = '#ef4444'; e.target.style.boxShadow = '0 0 0 3px rgba(239,68,68,0.1)' }}
+        onBlur={e => { e.target.style.borderColor = '#27272a'; e.target.style.boxShadow = 'none' }}
+      />
+      {rightSlot}
+    </div>
+  )
+}
+
+function SubmitButton({ label, loadingLabel, loading }) {
+  return (
+    <motion.button type="submit" disabled={loading}
+      whileHover={!loading ? { scale: 1.01, y: -1 } : {}}
+      whileTap={!loading ? { scale: 0.99 } : {}}
+      style={{
+        background: loading ? '#7f1d1d' : '#ef4444',
+        color: 'white', border: 'none', padding: '12px 20px',
+        borderRadius: 8, fontSize: 14, fontWeight: 600,
+        cursor: loading ? 'not-allowed' : 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        fontFamily: 'inherit', width: '100%', marginTop: 4,
+        boxShadow: loading ? 'none' : '0 0 24px rgba(239,68,68,0.22)',
+        transition: 'background 0.2s, box-shadow 0.2s',
+      }}>
+      {loading
+        ? <><Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite' }} />{loadingLabel}</>
+        : <>{label}<ArrowRight size={16} /></>}
+    </motion.button>
+  )
+}
+
+function MessageBox({ text, isError }) {
+  if (!text) return null
+  return (
+    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+      style={{
+        background: isError ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
+        border: `1px solid ${isError ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}`,
+        borderRadius: 8, padding: '10px 14px', fontSize: 12,
+        color: isError ? '#fca5a5' : '#86efac', lineHeight: 1.5,
+      }}>
+      {text}
+    </motion.div>
+  )
+}
+
 export default function Login() {
   const [mode, setMode] = useState(MODES.LOGIN)
   const [email, setEmail] = useState('')
@@ -91,65 +151,12 @@ export default function Login() {
     }
   }
 
-  const inputStyle = {
-    width: '100%', background: '#18181b', border: '1px solid #27272a',
-    color: '#fafafa', padding: '10px 14px', borderRadius: 8,
-    fontSize: 14, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-    transition: 'border-color 0.2s, box-shadow 0.2s',
-  }
-  const inputWithIconStyle = { ...inputStyle, paddingLeft: 36 }
-
-  const Field = ({ icon: Icon, type = 'text', value, onChange, placeholder, autoComplete, rightSlot }) => (
-    <div style={{ position: 'relative' }}>
-      <Icon size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#52525b', pointerEvents: 'none' }} />
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        autoComplete={autoComplete} required
-        style={{ ...inputWithIconStyle, paddingRight: rightSlot ? 40 : 14 }}
-        onFocus={e => { e.target.style.borderColor = '#ef4444'; e.target.style.boxShadow = '0 0 0 3px rgba(239,68,68,0.1)' }}
-        onBlur={e => { e.target.style.borderColor = '#27272a'; e.target.style.boxShadow = 'none' }}
-      />
-      {rightSlot}
-    </div>
-  )
-
-  const PasswordToggle = (
+  const passwordToggle = (
     <button type="button" onClick={() => setShowPass(v => !v)}
       style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#52525b', cursor: 'pointer', padding: 0 }}>
       {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
     </button>
   )
-
-  const SubmitButton = ({ label, loadingLabel }) => (
-    <motion.button type="submit" disabled={loading}
-      whileHover={!loading ? { scale: 1.01, y: -1 } : {}}
-      whileTap={!loading ? { scale: 0.99 } : {}}
-      style={{
-        background: loading ? '#7f1d1d' : '#ef4444',
-        color: 'white', border: 'none', padding: '12px 20px',
-        borderRadius: 8, fontSize: 14, fontWeight: 600,
-        cursor: loading ? 'not-allowed' : 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        fontFamily: 'inherit', width: '100%', marginTop: 4,
-        boxShadow: loading ? 'none' : '0 0 24px rgba(239,68,68,0.22)',
-        transition: 'background 0.2s, box-shadow 0.2s',
-      }}>
-      {loading
-        ? <><Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite' }} />{loadingLabel}</>
-        : <>{label}<ArrowRight size={16} /></>}
-    </motion.button>
-  )
-
-  const MessageBox = ({ text, isError }) => text ? (
-    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-      style={{
-        background: isError ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
-        border: `1px solid ${isError ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}`,
-        borderRadius: 8, padding: '10px 14px', fontSize: 12,
-        color: isError ? '#fca5a5' : '#86efac', lineHeight: 1.5,
-      }}>
-      {text}
-    </motion.div>
-  ) : null
 
   return (
     <div style={{
@@ -201,7 +208,7 @@ export default function Login() {
                   </div>
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 500, color: '#a1a1aa', display: 'block', marginBottom: 6 }}>Senha</label>
-                    <Field icon={Lock} type={showPass ? 'text' : 'password'} value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" rightSlot={PasswordToggle} />
+                    <Field icon={Lock} type={showPass ? 'text' : 'password'} value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" rightSlot={passwordToggle} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button type="button" onClick={() => switchMode(MODES.RESET)}
@@ -210,7 +217,7 @@ export default function Login() {
                     </button>
                   </div>
                   <AnimatePresence>{error && <MessageBox text={error} isError />}</AnimatePresence>
-                  <SubmitButton label="Entrar" loadingLabel="Entrando..." />
+                  <SubmitButton label="Entrar" loadingLabel="Entrando..." loading={loading} />
                 </form>
                 <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid #1c1c20', textAlign: 'center' }}>
                   <span style={{ fontSize: 13, color: '#71717a' }}>Não tem conta? </span>
@@ -240,11 +247,11 @@ export default function Login() {
                     <label style={{ fontSize: 12, fontWeight: 500, color: '#a1a1aa', display: 'block', marginBottom: 6 }}>
                       Senha <span style={{ color: '#52525b', fontSize: 11 }}>(mín. 6 caracteres)</span>
                     </label>
-                    <Field icon={Lock} type={showPass ? 'text' : 'password'} value={password} onChange={setPassword} placeholder="••••••••" autoComplete="new-password" rightSlot={PasswordToggle} />
+                    <Field icon={Lock} type={showPass ? 'text' : 'password'} value={password} onChange={setPassword} placeholder="••••••••" autoComplete="new-password" rightSlot={passwordToggle} />
                   </div>
                   <AnimatePresence>{error && <MessageBox text={error} isError />}</AnimatePresence>
                   <AnimatePresence>{info && <MessageBox text={info} isError={false} />}</AnimatePresence>
-                  <SubmitButton label="Criar conta" loadingLabel="Criando..." />
+                  <SubmitButton label="Criar conta" loadingLabel="Criando..." loading={loading} />
                 </form>
                 <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid #1c1c20', textAlign: 'center' }}>
                   <span style={{ fontSize: 13, color: '#71717a' }}>Já tem conta? </span>
@@ -268,7 +275,7 @@ export default function Login() {
                   </div>
                   <AnimatePresence>{error && <MessageBox text={error} isError />}</AnimatePresence>
                   <AnimatePresence>{info && <MessageBox text={info} isError={false} />}</AnimatePresence>
-                  <SubmitButton label="Enviar link" loadingLabel="Enviando..." />
+                  <SubmitButton label="Enviar link" loadingLabel="Enviando..." loading={loading} />
                 </form>
                 <div style={{ marginTop: 16, textAlign: 'center' }}>
                   <button onClick={() => switchMode(MODES.LOGIN)}
