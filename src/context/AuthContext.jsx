@@ -26,47 +26,37 @@ export function AuthProvider({ children }) {
   const [sessionError, setSessionError] = useState(null)
 
   useEffect(() => {
-    // Recupera sessão existente ao montar
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) setSessionError(error.message)
+    // Único handler de sessão — padrão recomendado Supabase v2
+    // Callback síncrono: async dentro do onAuthStateChange não é aguardado pelo Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // TOKEN_REFRESHED não deve rebuscar o perfil
+      if (event === 'TOKEN_REFRESHED') return
+
       const su = session?.user ?? null
-      if (su) {
-        const mapped = mapSupabaseUser(su)
-        const cached = localStorage.getItem(roleKey(su.id))
-        if (cached) {
-          // Carrega instantaneamente com role em cache
-          setUser({ ...mapped, role: cached })
-          setLoading(false)
-          // Atualiza em segundo plano (detecta mudanças de role)
-          fetchProfileRole(su.id).then(role =>
-            setUser(u => u ? { ...u, role } : u)
-          )
-        } else {
-          // Primeiro login: aguarda busca real
-          fetchProfileRole(su.id).then(role => {
-            setUser({ ...mapped, role })
-            setLoading(false)
-          })
-        }
-      } else {
+
+      if (!su) {
         setUser(null)
         setLoading(false)
+        return
       }
-    })
 
-    // Escuta mudanças de sessão (login, logout)
-    // Ignora INITIAL_SESSION (já tratado pelo getSession acima) e TOKEN_REFRESHED
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return
-      const su = session?.user ?? null
-      if (su) {
-        const mapped = mapSupabaseUser(su)
-        const role = await fetchProfileRole(su.id)
-        setUser({ ...mapped, role })
+      const mapped  = mapSupabaseUser(su)
+      const cached  = localStorage.getItem(roleKey(su.id))
+
+      if (cached) {
+        // Carrega instantaneamente com role em cache
+        setUser({ ...mapped, role: cached })
+        setLoading(false)
+        // Atualiza em segundo plano (detecta mudança de role no banco)
+        fetchProfileRole(su.id).then(role =>
+          setUser(u => u ? { ...u, role } : u)
+        )
       } else {
-        setUser(null)
+        // Sem cache: aguarda busca antes de liberar o app
+        fetchProfileRole(su.id)
+          .then(role => { setUser({ ...mapped, role }); setLoading(false) })
+          .catch(()  => { setUser({ ...mapped, role: 'comercial' }); setLoading(false) })
       }
-      setLoading(false)
     })
 
     return () => subscription.unsubscribe()
