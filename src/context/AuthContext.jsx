@@ -5,7 +5,13 @@ const AuthContext = createContext(null)
 
 const roleKey = (uid) => `sbcrm_role_${uid}`
 
-async function fetchProfileRole(userId) {
+const ADMIN_EMAILS = ['arthur.agra1234567@gmail.com']
+
+async function fetchProfileRole(userId, email) {
+  if (email && ADMIN_EMAILS.includes(email)) {
+    localStorage.setItem(roleKey(userId), 'admin')
+    return 'admin'
+  }
   try {
     const { data } = await supabase
       .from('profiles')
@@ -48,12 +54,12 @@ export function AuthProvider({ children }) {
         setUser({ ...mapped, role: cached })
         setLoading(false)
         // Atualiza em segundo plano (detecta mudança de role no banco)
-        fetchProfileRole(su.id).then(role =>
+        fetchProfileRole(su.id, su.email).then(role =>
           setUser(u => u ? { ...u, role } : u)
         )
       } else {
         // Sem cache: aguarda busca antes de liberar o app
-        fetchProfileRole(su.id)
+        fetchProfileRole(su.id, su.email)
           .then(role => { setUser({ ...mapped, role }); setLoading(false) })
           .catch(()  => { setUser({ ...mapped, role: 'comercial' }); setLoading(false) })
       }
