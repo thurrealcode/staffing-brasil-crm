@@ -127,12 +127,32 @@ export function buildContratadosPorMes(candidatos) {
   }))
 }
 
+// ── Desempenho por consultor ──────────────────────────────────
+
+export function buildDesempenho(leads, agenda, prospeccao) {
+  const map = {}
+
+  const add = (nome, field) => {
+    const key = nome?.trim() || 'Sem responsável'
+    if (!map[key]) map[key] = { nome: key, leads: 0, reunioes: 0, prospeccoes: 0 }
+    map[key][field]++
+  }
+
+  leads.forEach(l => add(l.responsavel_nome, 'leads'))
+  agenda.forEach(a => add(a.responsavel_nome, 'reunioes'))
+  prospeccao.forEach(p => add(p.responsavel_nome, 'prospeccoes'))
+
+  return Object.values(map)
+    .map(p => ({ ...p, total: p.leads + p.reunioes + p.prospeccoes }))
+    .sort((a, b) => b.total - a.total)
+}
+
 // ── Query principal ───────────────────────────────────────────
 
 export async function fetchRelatoriosData(periodo) {
   const { start, prevStart, prevEnd, sixMonthsAgo } = periodDates(periodo)
 
-  // 13 queries em paralelo — single round trip
+  // 16 queries em paralelo — single round trip
   const [
     // Contagens do período atual
     rLeads, rFechados, rContratados, rAgenda,
@@ -144,6 +164,8 @@ export async function fetchRelatoriosData(periodo) {
     rPeriodLeads,   // leads do período → funil + segmentos
     rChartLeads,    // últimos 6 meses  → gráfico de área
     rChartCands,    // últimos 6 meses  → funil recrutamento + linha
+    // Desempenho por consultor
+    rDeseLeads, rDeseAgenda, rDeseProsp,
   ] = await Promise.all([
     supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', start),
     supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', start).eq('status', 'Fechado'),
@@ -161,12 +183,17 @@ export async function fetchRelatoriosData(periodo) {
     supabase.from('leads').select('status, segmento, created_at').gte('created_at', start),
     supabase.from('leads').select('status, created_at').gte('created_at', sixMonthsAgo).order('created_at'),
     supabase.from('candidatos').select('status, created_at').gte('created_at', sixMonthsAgo).order('created_at'),
+
+    supabase.from('leads').select('responsavel_nome').gte('created_at', start),
+    supabase.from('agenda').select('responsavel_nome').gte('created_at', start),
+    supabase.from('prospeccao').select('responsavel_nome').gte('created_at', start),
   ])
 
   // Lança o primeiro erro encontrado
   for (const r of [rLeads, rFechados, rContratados, rAgenda, rEmpresas, rVagas,
                    rLeadsPrev, rFechadosPrev, rContratadosPrev, rAgendaPrev,
-                   rPeriodLeads, rChartLeads, rChartCands]) {
+                   rPeriodLeads, rChartLeads, rChartCands,
+                   rDeseLeads, rDeseAgenda, rDeseProsp]) {
     if (r.error) throw r.error
   }
 
@@ -202,5 +229,6 @@ export async function fetchRelatoriosData(periodo) {
     contratadosPorMes: buildContratadosPorMes(rChartCands.data ?? []),
     totalContratados:  cands_n,
     contratadosTrend:  calcTrend(cands_n, cands_prev),
+    desempenho:        buildDesempenho(rDeseLeads.data ?? [], rDeseAgenda.data ?? [], rDeseProsp.data ?? []),
   }
 }

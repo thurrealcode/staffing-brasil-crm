@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import {
   TrendingUp, TrendingDown, Download, Calendar, Users, Building2,
-  UserCheck, Briefcase, Target, AlertCircle, RefreshCw, Loader2
+  UserCheck, Briefcase, Target, AlertCircle, RefreshCw, Loader2, Medal
 } from 'lucide-react'
 import { fetchRelatoriosData } from '../lib/relatoriosService'
 import jsPDF from 'jspdf'
@@ -266,6 +266,7 @@ export default function Relatorios() {
   const contratadosPorMes= data?.contratadosPorMes ?? []
   const totalContratados = data?.totalContratados  ?? 0
   const contratadosTrend = data?.contratadosTrend  ?? { label: '—', positive: true }
+  const desempenho       = data?.desempenho        ?? []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -481,6 +482,123 @@ export default function Relatorios() {
           )}
         </motion.div>
       </div>
+
+      {/* ── Desempenho por Consultor ── */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }}
+        style={{ background: '#111113', border: '1px solid #1c1c20', borderRadius: 12, padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <Medal size={15} style={{ color: '#f59e0b' }} />
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#fafafa' }}>Desempenho por Consultor</div>
+        </div>
+        <div style={{ fontSize: 12, color: '#52525b', marginBottom: 20 }}>
+          Leads cadastrados, reuniões agendadas e prospecções no período
+        </div>
+
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[...Array(4)].map((_, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div className="skeleton" style={{ width: 28, height: 28, borderRadius: '50%' }} />
+                <div className="skeleton" style={{ width: 120, height: 13, borderRadius: 4 }} />
+                <div style={{ flex: 1 }}>
+                  <div className="skeleton" style={{ width: '100%', height: 6, borderRadius: 3 }} />
+                </div>
+                <div className="skeleton" style={{ width: 30, height: 13, borderRadius: 4 }} />
+              </div>
+            ))}
+          </div>
+        ) : desempenho.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#52525b', textAlign: 'center', padding: '16px 0' }}>
+            Nenhuma ação registrada no período
+          </p>
+        ) : (
+          <>
+            {/* Header da tabela */}
+            <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 80px 80px 100px 70px', gap: 8, alignItems: 'center', marginBottom: 8, padding: '0 4px' }}>
+              <div />
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#52525b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Consultor</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Leads</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Reuniões</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Prospecções</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'right' }}>Total</div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {desempenho.map((p, i) => {
+                const maxTotal = desempenho[0]?.total || 1
+                const barPct   = Math.round((p.total / maxTotal) * 100)
+                const medal    = i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#cd7c35' : null
+                const initials = p.nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+                return (
+                  <motion.div key={p.nome}
+                    initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 * i }}
+                    style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 10, padding: '12px 16px' }}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 80px 80px 100px 70px', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                      {/* Avatar */}
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: medal ? `${medal}22` : 'rgba(59,130,246,0.12)', border: `1.5px solid ${medal || 'rgba(59,130,246,0.25)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: medal || '#3b82f6', lineHeight: 1 }}>{initials}</span>
+                      </div>
+
+                      {/* Nome */}
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#fafafa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.nome}
+                        {medal && <span style={{ marginLeft: 6, fontSize: 14 }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>}
+                      </div>
+
+                      {/* Leads */}
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#3b82f6' }}>{p.leads}</span>
+                      </div>
+
+                      {/* Reuniões */}
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#ef4444' }}>{p.reunioes}</span>
+                      </div>
+
+                      {/* Prospecções */}
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#f59e0b' }}>{p.prospeccoes}</span>
+                      </div>
+
+                      {/* Total */}
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: '#fafafa' }}>{p.total}</span>
+                      </div>
+                    </div>
+
+                    {/* Barra de progresso segmentada */}
+                    <div style={{ height: 5, background: '#27272a', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
+                      {p.leads > 0 && (
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${(p.leads / p.total) * barPct}%` }} transition={{ delay: 0.1 + i * 0.05, duration: 0.5 }}
+                          style={{ height: '100%', background: '#3b82f6' }} />
+                      )}
+                      {p.reunioes > 0 && (
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${(p.reunioes / p.total) * barPct}%` }} transition={{ delay: 0.2 + i * 0.05, duration: 0.5 }}
+                          style={{ height: '100%', background: '#ef4444' }} />
+                      )}
+                      {p.prospeccoes > 0 && (
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${(p.prospeccoes / p.total) * barPct}%` }} transition={{ delay: 0.3 + i * 0.05, duration: 0.5 }}
+                          style={{ height: '100%', background: '#f59e0b' }} />
+                      )}
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+
+            {/* Legenda */}
+            <div style={{ display: 'flex', gap: 16, marginTop: 14, justifyContent: 'flex-end' }}>
+              {[['#3b82f6', 'Leads'], ['#ef4444', 'Reuniões'], ['#f59e0b', 'Prospecções']].map(([color, label]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+                  <span style={{ fontSize: 11, color: '#52525b' }}>{label}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </motion.div>
 
       {/* ── Recrutamento + Contratados ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
