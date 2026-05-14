@@ -4,9 +4,10 @@ import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Building2, User, MapP
 import { fetchAgenda, createEvento, updateEvento, deleteEvento, getEmailFromEvento } from '../lib/agendaService'
 
 const TIPO_CONFIG = {
-  'Reunião':    { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)' },
-  'Entrevista': { color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)' },
-  'Follow-up':  { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
+  'Reunião':            { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)' },
+  'Reunião Comercial':  { color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.2)' },
+  'Entrevista':         { color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)' },
+  'Follow-up':          { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
 }
 
 const STATUS_OPTS = ['Agendado', 'Confirmado', 'Realizado', 'Cancelado']
