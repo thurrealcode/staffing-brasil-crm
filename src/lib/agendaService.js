@@ -107,7 +107,9 @@ export async function updateEvento(id, evento) {
     .single()
 
   if (error) throw error
-  return fromDB(data)
+  const eventoMapped = fromDB(data)
+  syncEventoGoogleCalendar(eventoMapped) // re-sync: atualiza no Google Calendar
+  return eventoMapped
 }
 
 export async function deleteEvento(id) {

@@ -65,7 +65,7 @@ serve(async (req) => {
   )
 
   const body = await req.json()
-  const { eventoId, responsavelEmail, titulo, data, horario, empresa, contato, local, observacoes, participantes } = body
+  const { eventoId, responsavelEmail, titulo, data, horario, empresa, contato, local, observacoes, participantes, googleEventId } = body
 
   // ── Busca integração do responsável ou fallback para o chamador ──
 
@@ -150,17 +150,20 @@ serve(async (req) => {
     eventPayload.attendees = attendees
   }
 
-  const calRes = await fetch(
-    "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(eventPayload),
-    }
-  )
+  // Se já existe no Google Calendar → PATCH; senão → POST
+  const isUpdate = !!googleEventId
+  const calUrl = isUpdate
+    ? `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}?conferenceDataVersion=1&sendUpdates=all`
+    : `https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all`
+
+  const calRes = await fetch(calUrl, {
+    method: isUpdate ? "PATCH" : "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(eventPayload),
+  })
 
   if (!calRes.ok) {
     const detail = await calRes.text()

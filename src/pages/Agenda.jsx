@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Building2, User, MapPin, X, RefreshCw, AlertCircle, Pencil, Trash2, Video } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Building2, User, MapPin, X, RefreshCw, AlertCircle, Pencil, Trash2, Video, UserCheck } from 'lucide-react'
 import { fetchAgenda, createEvento, updateEvento, deleteEvento, getEmailFromEvento } from '../lib/agendaService'
 
 const TIPO_CONFIG = {
@@ -414,9 +414,10 @@ export default function Agenda() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     {[
-                      { icon: Building2, label: event.empresa },
-                      { icon: User,      label: event.contato },
-                      { icon: MapPin,    label: event.local },
+                      { icon: Building2,  label: event.empresa },
+                      { icon: User,       label: event.contato },
+                      { icon: MapPin,     label: event.local },
+                      { icon: UserCheck,  label: event.responsavelNome ? `Resp: ${event.responsavelNome}` : null },
                     ].map(({ icon: Icon, label }) => label ? (
                       <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Icon size={12} style={{ color: '#94a3b8' }} />
