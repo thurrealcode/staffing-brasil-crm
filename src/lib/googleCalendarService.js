@@ -40,6 +40,20 @@ export async function disconnectGoogleCalendar() {
   if (error) throw new Error(error.message)
 }
 
+// Remove um evento do Google Calendar pelo eventoId do CRM
+export async function deleteEventoGoogleCalendar(eventoId) {
+  try {
+    const headers = await authHeaders()
+    await fetch(`${FUNCTIONS_URL}/google-calendar-delete`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ eventoId }),
+    })
+  } catch {
+    // Não bloqueia o fluxo principal se falhar
+  }
+}
+
 // Sincroniza um evento da Agenda com o Google Calendar (fire-and-forget seguro)
 export async function syncEventoGoogleCalendar(evento) {
   try {

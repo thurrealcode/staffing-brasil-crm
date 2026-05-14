@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { notifyAdmins } from './notificationsService'
-import { syncEventoGoogleCalendar } from './googleCalendarService'
+import { syncEventoGoogleCalendar, deleteEventoGoogleCalendar } from './googleCalendarService'
 
 // ── Mapeamento DB (snake_case) ↔ App (camelCase) ──────────────
 
@@ -111,6 +111,9 @@ export async function updateEvento(id, evento) {
 }
 
 export async function deleteEvento(id) {
+  // Remove do Google Calendar primeiro (enquanto o registro ainda existe no banco)
+  await deleteEventoGoogleCalendar(id)
+
   const { error } = await supabase
     .from('agenda')
     .delete()
