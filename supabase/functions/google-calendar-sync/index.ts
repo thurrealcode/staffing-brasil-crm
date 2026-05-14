@@ -30,11 +30,14 @@ async function refreshToken(integration: Record<string, string>, supabaseAdmin: 
 }
 
 function buildDatetime(data: string, horario: string) {
-  const [y, m, d] = data.split("-").map(Number)
-  const [h, min]  = (horario || "09:00").split(":").map(Number)
-  const start = new Date(y, m - 1, d, h, min)
-  const end   = new Date(start.getTime() + 60 * 60 * 1000) // +1h padrão
-  return { start, end }
+  const [h, min] = (horario || "09:00").split(":").map(Number)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  // Passa horário local sem sufixo Z — Google interpreta no timeZone informado
+  const startStr = `${data}T${pad(h)}:${pad(min)}:00`
+  const endH = h + 1 >= 24 ? 23 : h + 1
+  const endMin = h + 1 >= 24 ? 59 : min
+  const endStr = `${data}T${pad(endH)}:${pad(endMin)}:00`
+  return { startStr, endStr }
 }
 
 // ── Handler ───────────────────────────────────────────────────
@@ -115,7 +118,7 @@ serve(async (req) => {
 
   // ── Cria evento no Google Calendar com Google Meet ────────────
 
-  const { start, end } = buildDatetime(data, horario)
+  const { startStr, endStr } = buildDatetime(data, horario)
 
   const description = [
     empresa && `Empresa: ${empresa}`,
@@ -133,8 +136,8 @@ serve(async (req) => {
     summary:     titulo,
     description,
     location:    local || undefined,
-    start: { dateTime: start.toISOString(), timeZone: "America/Sao_Paulo" },
-    end:   { dateTime: end.toISOString(),   timeZone: "America/Sao_Paulo" },
+    start: { dateTime: startStr, timeZone: "America/Sao_Paulo" },
+    end:   { dateTime: endStr,   timeZone: "America/Sao_Paulo" },
     conferenceData: {
       createRequest: {
         requestId: `staffing-crm-${eventoId}`,
