@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { fetchContratos, createContrato, updateContrato, deleteContrato, addTimelineEntry } from '../lib/contratosService'
 import { useAuth } from '../context/AuthContext'
+import CancelamentoModal from '../components/CancelamentoModal'
+import { registrarCancelamento } from '../lib/cancelamentosService'
 
 // ── Configurações ─────────────────────────────────────────────
 
@@ -496,6 +498,7 @@ export default function Contratos() {
   const [showModal, setShowModal] = useState(false)
   const [editingContrato, setEditingContrato] = useState(null)
   const [viewingContrato, setViewingContrato] = useState(null)
+  const [cancelModalData, setCancelModalData] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -515,6 +518,24 @@ export default function Contratos() {
   // ── CRUD ──────────────────────────────────────────────────
 
   const handleSave = async (form, pdfFile) => {
+    if (editingContrato && form.status === 'Cancelado') {
+      const current = contratos.find(c => c.id === editingContrato.id)
+      if (current?.status !== 'Cancelado') {
+        setCancelModalData({
+          titulo: `Contrato: ${form.empresa}`,
+          onConfirm: async (motivo) => {
+            await registrarCancelamento({ titulo: `Contrato: ${form.empresa}`, tipo: 'contrato', motivo })
+            setCancelModalData(null)
+            await doSave(form, pdfFile)
+          },
+        })
+        return
+      }
+    }
+    await doSave(form, pdfFile)
+  }
+
+  const doSave = async (form, pdfFile) => {
     setSaving(true)
     try {
       if (editingContrato) {
@@ -534,15 +555,21 @@ export default function Contratos() {
     }
   }
 
-  const handleDelete = async (contrato) => {
-    if (!window.confirm(`Excluir o contrato de "${contrato.empresa}"? Esta ação não pode ser desfeita.`)) return
-    try {
-      await deleteContrato(contrato.id, contrato.pdf_path)
-      setContratos(prev => prev.filter(c => c.id !== contrato.id))
-      setViewingContrato(null)
-    } catch (e) {
-      alert(e.message || 'Erro ao excluir')
-    }
+  const handleDelete = (contrato) => {
+    setCancelModalData({
+      titulo: `Contrato: ${contrato.empresa}`,
+      onConfirm: async (motivo) => {
+        setCancelModalData(null)
+        try {
+          await registrarCancelamento({ titulo: `Contrato: ${contrato.empresa}`, tipo: 'contrato', motivo })
+          await deleteContrato(contrato.id, contrato.pdf_path)
+          setContratos(prev => prev.filter(c => c.id !== contrato.id))
+          setViewingContrato(null)
+        } catch (e) {
+          alert(e.message || 'Erro ao excluir')
+        }
+      },
+    })
   }
 
   const handleAddNote = async (id, entry) => {
@@ -776,6 +803,14 @@ export default function Contratos() {
             onEdit={openEdit}
             onDelete={handleDelete}
             onAddNote={handleAddNote}
+          />
+        )}
+        {cancelModalData && (
+          <CancelamentoModal
+            key="cancel"
+            titulo={cancelModalData.titulo}
+            onConfirm={cancelModalData.onConfirm}
+            onClose={() => setCancelModalData(null)}
           />
         )}
       </AnimatePresence>

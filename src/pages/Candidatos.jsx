@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, X, Brain, ChevronRight, Award, MapPin, Briefcase, RefreshCw, Pencil, Trash2, AlertCircle, Eye, Download, FileText } from 'lucide-react'
 import { fetchCandidatos, createCandidato, updateCandidato, deleteCandidato, uploadCurriculo, getCurriculoUrl } from '../lib/candidatosService'
+import CancelamentoModal from '../components/CancelamentoModal'
+import { registrarCancelamento } from '../lib/cancelamentosService'
 
 const STATUS_CONFIG = {
   'Triagem':           { color: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.2)' },
@@ -424,6 +426,7 @@ export default function Candidatos() {
   const [selected,    setSelected]    = useState(null)
   const [formOpen,    setFormOpen]    = useState(false)
   const [editTarget,  setEditTarget]  = useState(null)
+  const [cancelModalData, setCancelModalData] = useState(null)
 
   const loadCandidatos = useCallback(async () => {
     setLoading(true)
@@ -440,6 +443,24 @@ export default function Candidatos() {
   useEffect(() => { loadCandidatos() }, [loadCandidatos])
 
   const handleSave = async (data) => {
+    if (editTarget && data.status === 'Reprovado') {
+      const current = candidatos.find(c => c.id === editTarget.id)
+      if (current?.status !== 'Reprovado') {
+        setCancelModalData({
+          titulo: `Candidato: ${data.nome}`,
+          onConfirm: async (motivo) => {
+            await registrarCancelamento({ titulo: `Candidato: ${data.nome}`, tipo: 'candidato', motivo })
+            setCancelModalData(null)
+            await doSave(data)
+          },
+        })
+        return
+      }
+    }
+    await doSave(data)
+  }
+
+  const doSave = async (data) => {
     setSaving(true)
     try {
       if (editTarget) {
@@ -459,18 +480,24 @@ export default function Candidatos() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Excluir este candidato?')) return
-    setDeletingId(id)
-    try {
-      await deleteCandidato(id)
-      setCandidatos(prev => prev.filter(c => c.id !== id))
-      setSelected(null)
-    } catch (err) {
-      alert(err.message || 'Erro ao excluir candidato')
-    } finally {
-      setDeletingId(null)
-    }
+  const handleDelete = (candidato) => {
+    setCancelModalData({
+      titulo: `Candidato: ${candidato.nome}`,
+      onConfirm: async (motivo) => {
+        setCancelModalData(null)
+        setDeletingId(candidato.id)
+        try {
+          await registrarCancelamento({ titulo: `Candidato: ${candidato.nome}`, tipo: 'candidato', motivo })
+          await deleteCandidato(candidato.id)
+          setCandidatos(prev => prev.filter(c => c.id !== candidato.id))
+          setSelected(null)
+        } catch (err) {
+          alert(err.message || 'Erro ao excluir candidato')
+        } finally {
+          setDeletingId(null)
+        }
+      },
+    })
   }
 
   const openEdit = (c) => {
@@ -611,7 +638,7 @@ export default function Candidatos() {
                       title="Editar">
                       <Pencil size={12} />
                     </button>
-                    <button onClick={() => handleDelete(c.id)} disabled={isDeleting}
+                    <button onClick={() => handleDelete(c)} disabled={isDeleting}
                       style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
                       title="Excluir">
                       {isDeleting ? <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block', fontSize: 12 }}>⟳</span> : <Trash2 size={12} />}
@@ -636,7 +663,7 @@ export default function Candidatos() {
             candidato={selected}
             onClose={() => setSelected(null)}
             onEdit={() => openEdit(selected)}
-            onDelete={() => handleDelete(selected.id)}
+            onDelete={() => handleDelete(selected)}
             deleting={deletingId === selected?.id}
           />
         )}
@@ -647,6 +674,14 @@ export default function Candidatos() {
             onClose={() => { setFormOpen(false); setEditTarget(null) }}
             onSave={handleSave}
             saving={saving}
+          />
+        )}
+        {cancelModalData && (
+          <CancelamentoModal
+            key="cancel"
+            titulo={cancelModalData.titulo}
+            onConfirm={cancelModalData.onConfirm}
+            onClose={() => setCancelModalData(null)}
           />
         )}
       </AnimatePresence>

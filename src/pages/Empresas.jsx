@@ -5,6 +5,8 @@ import {
   Mail, Phone, X, ChevronRight, Edit2, Trash2, Loader2, AlertCircle, RefreshCw
 } from 'lucide-react'
 import { fetchEmpresas, createEmpresa, updateEmpresa, deleteEmpresa } from '../lib/empresasService'
+import CancelamentoModal from '../components/CancelamentoModal'
+import { registrarCancelamento } from '../lib/cancelamentosService'
 
 // ── Configuração de status ────────────────────────────────────
 const STATUS_CONFIG = {
@@ -329,6 +331,7 @@ export default function Empresas() {
   const [filterStatus, setFilterStatus] = useState('Todos')
   const [viewModal, setViewModal]   = useState(null)
   const [formModal, setFormModal]   = useState(null)
+  const [cancelModalData, setCancelModalData] = useState(null)
 
   const loadEmpresas = useCallback(async () => {
     setLoading(true)
@@ -366,20 +369,25 @@ export default function Empresas() {
     }
   }
 
-  const handleDelete = async (id, e) => {
-    e.stopPropagation()
-    if (!confirm('Excluir esta empresa? Esta ação não pode ser desfeita.')) return
-    setDeletingId(id)
-    setError('')
-    try {
-      await deleteEmpresa(id)
-      setEmpresas(es => es.filter(e => e.id !== id))
-      if (viewModal?.id === id) setViewModal(null)
-    } catch (err) {
-      setError(err.message || 'Erro ao excluir empresa.')
-    } finally {
-      setDeletingId(null)
-    }
+  const handleDelete = (empresa) => {
+    setCancelModalData({
+      titulo: `Empresa: ${empresa.nome}`,
+      onConfirm: async (motivo) => {
+        setCancelModalData(null)
+        setDeletingId(empresa.id)
+        setError('')
+        try {
+          await registrarCancelamento({ titulo: `Empresa: ${empresa.nome}`, tipo: 'empresa', motivo })
+          await deleteEmpresa(empresa.id)
+          setEmpresas(es => es.filter(e => e.id !== empresa.id))
+          if (viewModal?.id === empresa.id) setViewModal(null)
+        } catch (err) {
+          setError(err.message || 'Erro ao excluir empresa.')
+        } finally {
+          setDeletingId(null)
+        }
+      },
+    })
   }
 
   const filtered = empresas
@@ -497,7 +505,7 @@ export default function Empresas() {
                           <Edit2 size={11} />
                         </button>
                         <button
-                          onClick={e => handleDelete(empresa.id, e)}
+                          onClick={e => { e.stopPropagation(); handleDelete(empresa) }}
                           disabled={isDeleting}
                           style={{ width: 28, height: 28, background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s' }}
                           onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)' }}
@@ -548,6 +556,16 @@ export default function Empresas() {
             saving={saving}
             onClose={() => !saving && setFormModal(null)}
             onSave={handleSave}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {cancelModalData && (
+          <CancelamentoModal
+            titulo={cancelModalData.titulo}
+            onConfirm={cancelModalData.onConfirm}
+            onClose={() => setCancelModalData(null)}
           />
         )}
       </AnimatePresence>

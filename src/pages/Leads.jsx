@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Edit2, Trash2, X, ChevronUp, ChevronDown, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import { fetchLeads, createLead, updateLead, deleteLead } from '../lib/leadsService'
+import CancelamentoModal from '../components/CancelamentoModal'
+import { registrarCancelamento } from '../lib/cancelamentosService'
 
 // ── Configurações de status ───────────────────────────────────
 const STATUS_CONFIG = {
@@ -165,6 +167,7 @@ export default function Leads() {
   const [filterSeg, setFilterSeg] = useState('Todos')
   const [modal, setModal]         = useState(null)
   const [sort, setSort]           = useState({ key: 'empresa', dir: 1 })
+  const [cancelModalData, setCancelModalData] = useState(null)
 
   const loadLeads = useCallback(async () => {
     setLoading(true)
@@ -182,6 +185,24 @@ export default function Leads() {
   useEffect(() => { loadLeads() }, [loadLeads])
 
   const handleSave = async (form) => {
+    if (form.id && form.status === 'Perdido') {
+      const current = leads.find(l => l.id === form.id)
+      if (current?.status !== 'Perdido') {
+        setCancelModalData({
+          titulo: `Lead: ${form.empresa}`,
+          onConfirm: async (motivo) => {
+            await registrarCancelamento({ titulo: `Lead: ${form.empresa}`, tipo: 'lead', motivo })
+            setCancelModalData(null)
+            await doSave(form)
+          },
+        })
+        return
+      }
+    }
+    await doSave(form)
+  }
+
+  const doSave = async (form) => {
     setSaving(true)
     setError('')
     try {
@@ -200,18 +221,24 @@ export default function Leads() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Excluir este lead? Esta ação não pode ser desfeita.')) return
-    setDeletingId(id)
-    setError('')
-    try {
-      await deleteLead(id)
-      setLeads(ls => ls.filter(l => l.id !== id))
-    } catch (e) {
-      setError(e.message || 'Erro ao excluir lead.')
-    } finally {
-      setDeletingId(null)
-    }
+  const handleDelete = (lead) => {
+    setCancelModalData({
+      titulo: `Lead: ${lead.empresa}`,
+      onConfirm: async (motivo) => {
+        setCancelModalData(null)
+        setDeletingId(lead.id)
+        setError('')
+        try {
+          await registrarCancelamento({ titulo: `Lead: ${lead.empresa}`, tipo: 'lead', motivo })
+          await deleteLead(lead.id)
+          setLeads(ls => ls.filter(l => l.id !== lead.id))
+        } catch (e) {
+          setError(e.message || 'Erro ao excluir lead.')
+        } finally {
+          setDeletingId(null)
+        }
+      },
+    })
   }
 
   const filtered = leads
@@ -343,7 +370,7 @@ export default function Leads() {
                               onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.color = '#64748b' }}>
                               <Edit2 size={12} />
                             </button>
-                            <button onClick={() => handleDelete(lead.id)} disabled={isDeleting}
+                            <button onClick={() => handleDelete(lead)} disabled={isDeleting}
                               style={{ width: 30, height: 30, background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s' }}
                               onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; e.currentTarget.style.color = '#ef4444' }}
                               onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.color = '#64748b' }}>
@@ -385,6 +412,16 @@ export default function Leads() {
             saving={saving}
             onClose={() => !saving && setModal(null)}
             onSave={handleSave}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {cancelModalData && (
+          <CancelamentoModal
+            titulo={cancelModalData.titulo}
+            onConfirm={cancelModalData.onConfirm}
+            onClose={() => setCancelModalData(null)}
           />
         )}
       </AnimatePresence>

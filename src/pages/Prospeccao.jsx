@@ -11,6 +11,8 @@ import {
   fetchAtividades, createAtividade,
 } from '../lib/prospeccaoService'
 import { createLead } from '../lib/leadsService'
+import CancelamentoModal from '../components/CancelamentoModal'
+import { registrarCancelamento } from '../lib/cancelamentosService'
 
 // ── Configuração de status ────────────────────────────────────
 
@@ -521,6 +523,7 @@ export default function Prospeccao() {
   const [formOpen,     setFormOpen]     = useState(false)
   const [editTarget,   setEditTarget]   = useState(null)
   const [view,         setView]         = useState('lista') // 'lista' | 'kanban'
+  const [cancelModalData, setCancelModalData] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -539,6 +542,24 @@ export default function Prospeccao() {
   useEffect(() => { load() }, [load])
 
   const handleSave = async (data) => {
+    if (editTarget && data.status === 'Descartado') {
+      const current = itens.find(p => p.id === editTarget.id)
+      if (current?.status !== 'Descartado') {
+        setCancelModalData({
+          titulo: `Prospecção: ${data.empresa}`,
+          onConfirm: async (motivo) => {
+            await registrarCancelamento({ titulo: `Prospecção: ${data.empresa}`, tipo: 'prospeccao', motivo })
+            setCancelModalData(null)
+            await doSave(data)
+          },
+        })
+        return
+      }
+    }
+    await doSave(data)
+  }
+
+  const doSave = async (data) => {
     setSaving(true)
     try {
       if (editTarget) {
@@ -562,20 +583,26 @@ export default function Prospeccao() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Excluir esta prospecção?')) return
-    setDeletingId(id)
-    try {
-      await deleteProspeccao(id)
-      const next = itens.filter(p => p.id !== id)
-      setItens(next)
-      setColumns(buildColumns(next))
-      setSelected(null)
-    } catch (e) {
-      alert(e.message || 'Erro ao excluir')
-    } finally {
-      setDeletingId(null)
-    }
+  const handleDelete = (prosp) => {
+    setCancelModalData({
+      titulo: `Prospecção: ${prosp.empresa}`,
+      onConfirm: async (motivo) => {
+        setCancelModalData(null)
+        setDeletingId(prosp.id)
+        try {
+          await registrarCancelamento({ titulo: `Prospecção: ${prosp.empresa}`, tipo: 'prospeccao', motivo })
+          await deleteProspeccao(prosp.id)
+          const next = itens.filter(p => p.id !== prosp.id)
+          setItens(next)
+          setColumns(buildColumns(next))
+          setSelected(null)
+        } catch (e) {
+          alert(e.message || 'Erro ao excluir')
+        } finally {
+          setDeletingId(null)
+        }
+      },
+    })
   }
 
   const openEdit = (p) => {
@@ -747,7 +774,7 @@ export default function Prospeccao() {
                                 onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.color = '#64748b' }}>
                                 <Pencil size={12} />
                               </button>
-                              <button onClick={() => handleDelete(p.id)} disabled={isDeleting}
+                              <button onClick={e => { e.stopPropagation(); handleDelete(p) }} disabled={isDeleting}
                                 style={{ width: 30, height: 30, background: '#f8f9fa', border: '1px solid #e4e4e7', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s' }}
                                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; e.currentTarget.style.color = '#ef4444' }}
                                 onMouseLeave={e => { e.currentTarget.style.borderColor = '#e4e4e7'; e.currentTarget.style.color = '#64748b' }}>
@@ -850,7 +877,7 @@ export default function Prospeccao() {
           <DetailModal key="detail" prosp={selected}
             onClose={() => setSelected(null)}
             onEdit={() => openEdit(selected)}
-            onDelete={() => handleDelete(selected.id)}
+            onDelete={() => handleDelete(selected)}
             onUpdated={handleUpdated}
             deleting={deletingId === selected?.id}
           />
@@ -859,6 +886,14 @@ export default function Prospeccao() {
           <FormModal key="form" initial={editTarget} saving={saving}
             onClose={() => { setFormOpen(false); setEditTarget(null) }}
             onSave={handleSave}
+          />
+        )}
+        {cancelModalData && (
+          <CancelamentoModal
+            key="cancel"
+            titulo={cancelModalData.titulo}
+            onConfirm={cancelModalData.onConfirm}
+            onClose={() => setCancelModalData(null)}
           />
         )}
       </AnimatePresence>
