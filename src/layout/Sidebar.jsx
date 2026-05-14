@@ -1,7 +1,9 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { ROLE_LABELS } from '../lib/permissions'
+import { supabase } from '../lib/supabase'
 import {
   LayoutDashboard, Users, Building2, UserCheck, GitBranch,
   Calendar, MessageSquare, BarChart3, Settings,
@@ -35,7 +37,7 @@ const NAV_SECTIONS = [
   {
     label: 'Comunicação',
     items: [
-      { to: '/mensagens',  icon: MessageSquare, label: 'Mensagens',   badge: 3, roles: ['admin', 'comercial', 'recrutamento'] },
+      { to: '/mensagens',  icon: MessageSquare, label: 'Mensagens',   roles: ['admin', 'comercial', 'recrutamento'] },
       { to: '/relatorios', icon: BarChart3,     label: 'Relatórios',            roles: ['admin'] },
       { to: '/ia',         icon: Sparkles,      label: 'IA Integrada',          roles: ['admin', 'comercial', 'recrutamento'] },
     ]
@@ -45,6 +47,43 @@ const NAV_SECTIONS = [
 export default function Sidebar({ collapsed, onToggle }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [unreadMsg, setUnreadMsg] = useState(0)
+
+  const seenKey = user ? `sbcrm_msg_seen_${user.id}` : null
+
+  // Conta mensagens não lidas desde a última visita ao chat
+  useEffect(() => {
+    if (!user) return
+    const lastSeen = localStorage.getItem(seenKey) || '1970-01-01T00:00:00Z'
+    supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .gt('created_at', lastSeen)
+      .neq('sender_id', user.id)
+      .or(`recipient_id.eq.${user.id},recipient_id.is.null`)
+      .then(({ count }) => setUnreadMsg(count || 0))
+
+    const channel = supabase
+      .channel('sidebar_unread_messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        const msg = payload.new
+        if (msg.sender_id === user.id) return
+        if (msg.recipient_id !== null && msg.recipient_id !== user.id) return
+        setUnreadMsg(prev => prev + 1)
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [user])
+
+  // Zera o badge e marca "visto agora" quando entra em /mensagens
+  useEffect(() => {
+    if (location.pathname === '/mensagens' && seenKey) {
+      localStorage.setItem(seenKey, new Date().toISOString())
+      setUnreadMsg(0)
+    }
+  }, [location.pathname, seenKey])
 
   const handleLogout = () => { logout(); navigate('/login') }
 
@@ -100,7 +139,9 @@ export default function Sidebar({ collapsed, onToggle }) {
             {collapsed && si > 0 && (
               <div style={{ height: 1, background: '#1c1c20', margin: '6px 10px' }} />
             )}
-            {visibleItems.map(({ to, icon: Icon, label, badge }) => (
+            {visibleItems.map(({ to, icon: Icon, label }) => {
+              const badge = to === '/mensagens' ? unreadMsg : 0
+              return (
               <NavLink key={to} to={to} title={collapsed ? label : undefined}
                 className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
                 style={{ position: 'relative', justifyContent: collapsed ? 'center' : 'flex-start' }}
@@ -114,7 +155,7 @@ export default function Sidebar({ collapsed, onToggle }) {
                     </motion.span>
                   )}
                 </AnimatePresence>
-                {badge && !collapsed && (
+                {badge > 0 && !collapsed && (
                   <AnimatePresence>
                     <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
                       style={{ background: '#ef4444', color: 'white', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, flexShrink: 0 }}>
@@ -122,11 +163,12 @@ export default function Sidebar({ collapsed, onToggle }) {
                     </motion.span>
                   </AnimatePresence>
                 )}
-                {badge && collapsed && (
+                {badge > 0 && collapsed && (
                   <div style={{ position: 'absolute', top: 6, right: 8, width: 7, height: 7, background: '#ef4444', borderRadius: '50%', boxShadow: '0 0 6px rgba(239,68,68,0.5)' }} />
                 )}
               </NavLink>
-            ))}
+              )
+            })}
           </div>
           )
         })}
