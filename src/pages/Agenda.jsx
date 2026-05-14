@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Building2, User, MapPin, X, RefreshCw, AlertCircle, Pencil, Trash2, Video } from 'lucide-react'
-import { fetchAgenda, createEvento, updateEvento, deleteEvento } from '../lib/agendaService'
+import { fetchAgenda, createEvento, updateEvento, deleteEvento, getEmailFromEvento } from '../lib/agendaService'
 
 const TIPO_CONFIG = {
   'Reunião':    { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)' },
@@ -37,13 +37,13 @@ function ErrorBanner({ message, onRetry }) {
 
 // ── Modal de formulário ───────────────────────────────────────
 
-const EMPTY_FORM = { titulo: '', tipo: 'Reunião', data: todayStr(), horario: '', empresa: '', contato: '', local: '', status: 'Agendado', observacoes: '' }
+const EMPTY_FORM = { titulo: '', tipo: 'Reunião', data: todayStr(), horario: '', empresa: '', contato: '', local: '', status: 'Agendado', observacoes: '', participantes: '' }
 
 function EventoFormModal({ initial, defaultDate, onClose, onSave, saving }) {
   const isEdit = !!initial?.id
   const [form, setForm] = useState(
     initial
-      ? { titulo: initial.titulo, tipo: initial.tipo, data: initial.data, horario: initial.horario, empresa: initial.empresa, contato: initial.contato, local: initial.local, status: initial.status, observacoes: initial.observacoes }
+      ? { titulo: initial.titulo, tipo: initial.tipo, data: initial.data, horario: initial.horario, empresa: initial.empresa, contato: initial.contato, local: initial.local, status: initial.status, observacoes: initial.observacoes, participantes: initial.participantes ?? '' }
       : { ...EMPTY_FORM, data: defaultDate || todayStr() }
   )
 
@@ -118,6 +118,19 @@ function EventoFormModal({ initial, defaultDate, onClose, onSave, saving }) {
               <label style={labelStyle}>Observações</label>
               <textarea value={form.observacoes} onChange={e => set('observacoes', e.target.value)} placeholder="Detalhes adicionais do evento..." rows={3}
                 style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
+            </div>
+
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Participantes — convite por e-mail</label>
+              <input
+                value={form.participantes}
+                onChange={e => set('participantes', e.target.value)}
+                placeholder="cliente@empresa.com, outro@gmail.com"
+                style={inputStyle}
+              />
+              <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
+                Separe múltiplos e-mails por vírgula. Receberão convite automático com o link do Meet.
+              </span>
             </div>
           </div>
 
@@ -200,8 +213,13 @@ export default function Agenda() {
     }
   }
 
-  const openEdit = (evento) => {
-    setEditTarget(evento)
+  const openEdit = async (evento) => {
+    let target = evento
+    if (!evento.participantes) {
+      const email = await getEmailFromEvento(evento)
+      if (email) target = { ...evento, participantes: email }
+    }
+    setEditTarget(target)
     setFormOpen(true)
   }
 

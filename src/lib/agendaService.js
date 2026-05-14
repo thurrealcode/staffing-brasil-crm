@@ -16,6 +16,7 @@ function fromDB(row) {
     local:            row.local,
     status:           row.status,
     observacoes:      row.observacoes,
+    participantes:    row.participantes    ?? '',
     empresaId:        row.empresa_id,
     candidatoId:      row.candidato_id,
     leadId:           row.lead_id,
@@ -40,12 +41,30 @@ function toDB(evento) {
     local:             evento.local             ?? '',
     status:            evento.status            ?? 'Agendado',
     observacoes:       evento.observacoes       ?? '',
+    participantes:     evento.participantes      ?? '',
     empresa_id:        evento.empresaId         || null,
     candidato_id:      evento.candidatoId       || null,
     lead_id:           evento.leadId            || null,
     responsavel_nome:  evento.responsavelNome   ?? '',
     responsavel_email: evento.responsavelEmail  ?? '',
   }
+}
+
+// Busca e-mail do lead ou empresa vinculados ao evento (para auto-preencher participantes)
+export async function getEmailFromEvento(evento) {
+  if (evento.participantes) return null
+
+  if (evento.leadId) {
+    const { data } = await supabase.from('leads').select('email').eq('id', evento.leadId).maybeSingle()
+    return data?.email || null
+  }
+
+  if (evento.empresaId) {
+    const { data } = await supabase.from('empresas').select('contato_email').eq('id', evento.empresaId).maybeSingle()
+    return data?.contato_email || null
+  }
+
+  return null
 }
 
 // ── CRUD ──────────────────────────────────────────────────────

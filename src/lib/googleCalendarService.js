@@ -58,6 +58,7 @@ export async function syncEventoGoogleCalendar(evento) {
         local:            evento.local,
         observacoes:      evento.observacoes,
         tipo:             evento.tipo,
+        participantes:    evento.participantes  ?? '',
       }),
     })
   } catch {

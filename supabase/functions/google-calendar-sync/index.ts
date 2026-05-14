@@ -62,7 +62,7 @@ serve(async (req) => {
   )
 
   const body = await req.json()
-  const { eventoId, responsavelEmail, titulo, data, horario, empresa, contato, local, observacoes } = body
+  const { eventoId, responsavelEmail, titulo, data, horario, empresa, contato, local, observacoes, participantes } = body
 
   // ── Busca integração do responsável ou fallback para o chamador ──
 
@@ -123,7 +123,13 @@ serve(async (req) => {
     observacoes || "",
   ].filter(Boolean).join("\n")
 
-  const eventPayload = {
+  const attendees = (participantes || "")
+    .split(",")
+    .map((e: string) => e.trim())
+    .filter((e: string) => e.includes("@"))
+    .map((email: string) => ({ email }))
+
+  const eventPayload: Record<string, unknown> = {
     summary:     titulo,
     description,
     location:    local || undefined,
@@ -137,8 +143,12 @@ serve(async (req) => {
     },
   }
 
+  if (attendees.length > 0) {
+    eventPayload.attendees = attendees
+  }
+
   const calRes = await fetch(
-    "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1",
+    "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all",
     {
       method: "POST",
       headers: {
