@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Users, Building2, Briefcase, UserCheck, Calendar, CheckCircle, TrendingUp, Activity, Clock, ArrowUpRight, ChevronRight, AlertCircle } from 'lucide-react'
+import { Users, Building2, Briefcase, UserCheck, Calendar, CheckCircle, TrendingUp, Activity, Clock, ArrowUpRight, ChevronRight, AlertCircle, XCircle } from 'lucide-react'
 import { fetchDashboardData } from '../lib/dashboardService'
+import { fetchCancelamentos } from '../lib/cancelamentosService'
 import { useAuth } from '../context/AuthContext'
 
 // ── Hooks ─────────────────────────────────────────────────────
@@ -116,15 +117,18 @@ export default function Dashboard() {
   const chartCols  = isSmall ? '1fr' : '1fr 1fr'
   const bottomCols = isSmall ? '1fr' : '1fr 300px'
 
-  const [dashData, setDashData] = useState(null)
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState(null)
+  const [dashData,      setDashData]      = useState(null)
+  const [loading,       setLoading]       = useState(true)
+  const [error,         setError]         = useState(null)
+  const [cancelamentos, setCancelamentos] = useState([])
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      setDashData(await fetchDashboardData())
+      const [dash, cancels] = await Promise.all([fetchDashboardData(), fetchCancelamentos()])
+      setDashData(dash)
+      setCancelamentos(cancels)
     } catch (err) {
       setError(err.message || 'Erro ao carregar dados do dashboard')
     } finally {
@@ -133,6 +137,17 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => { loadDashboard() }, [loadDashboard])
+
+  function tempoRelativo(dateStr) {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1)  return 'agora'
+    if (mins < 60) return `há ${mins}min`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24)  return `há ${hrs}h`
+    const days = Math.floor(hrs / 24)
+    return `há ${days}d`
+  }
 
   const kpis       = dashData?.kpis
   const funil      = dashData?.funil      ?? EMPTY_FUNIL
@@ -370,6 +385,64 @@ export default function Dashboard() {
           )}
         </motion.div>
       </div>
+
+      {/* ── Cancelamentos ── */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.54 }}
+        style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: 12, padding: 22, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Cancelamentos Recentes</div>
+            <div style={{ fontSize: 11, color: '#64748b' }}>Reuniões canceladas ou excluídas com motivo registrado</div>
+          </div>
+          <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 6, padding: '2px 10px' }}>
+            <span style={{ fontSize: 12, color: '#ef4444', fontWeight: 700 }}>{cancelamentos.length}</span>
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[...Array(3)].map((_, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div className="skeleton" style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div className="skeleton" style={{ width: '55%', height: 13, borderRadius: 3, marginBottom: 6 }} />
+                  <div className="skeleton" style={{ width: '80%', height: 11, borderRadius: 3 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : cancelamentos.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', padding: '20px 0' }}>Nenhum cancelamento registrado</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {cancelamentos.map((c, i) => (
+              <motion.div key={c.id}
+                initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.58 + i * 0.05 }}
+                style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '12px 0', borderBottom: i < cancelamentos.length - 1 ? '1px solid #f8f9fa' : 'none' }}
+              >
+                <div style={{ width: 30, height: 30, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                  <XCircle size={14} style={{ color: '#ef4444' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{c.titulo}</span>
+                    <span style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444', padding: '1px 7px', borderRadius: 5, fontSize: 10, fontWeight: 600, flexShrink: 0 }}>{c.tipo}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#ef4444', fontStyle: 'italic', marginBottom: 4 }}>"{c.motivo}"</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>por <strong style={{ color: '#374151' }}>{c.cancelado_por_nome || c.cancelado_por_email}</strong></span>
+                    <span style={{ fontSize: 10, color: '#9ca3af' }}>·</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <Clock size={9} style={{ color: '#9ca3af' }} />
+                      <span style={{ fontSize: 10, color: '#9ca3af' }}>{tempoRelativo(c.created_at)}</span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
 
       <style>{`@keyframes pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(239,68,68,0.4) } 50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(239,68,68,0) } }`}</style>
     </div>
