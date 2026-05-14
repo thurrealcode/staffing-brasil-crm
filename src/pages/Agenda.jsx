@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Building2, User, MapPin, X, RefreshCw, AlertCircle, Pencil, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Building2, User, MapPin, X, RefreshCw, AlertCircle, Pencil, Trash2, Video } from 'lucide-react'
 import { fetchAgenda, createEvento, updateEvento, deleteEvento } from '../lib/agendaService'
 
 const TIPO_CONFIG = {
@@ -413,7 +413,16 @@ export default function Agenda() {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                  {event.meetLink && (
+                    <div style={{ marginTop: 14 }}>
+                      <a href={event.meetLink} target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', background: 'linear-gradient(135deg,#1a73e8,#1558c0)', border: 'none', color: '#fff', padding: '9px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, textDecoration: 'none', boxSizing: 'border-box' }}>
+                        <Video size={13} /> Entrar no Google Meet
+                      </a>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                     <button onClick={() => openEdit(event)}
                       style={{ flex: 1, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', padding: '8px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                       <Pencil size={12} /> Editar
