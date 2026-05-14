@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { notifyAdmins } from './notificationsService'
+import { syncEventoGoogleCalendar } from './googleCalendarService'
 
 // ── Mapeamento DB (snake_case) ↔ App (camelCase) ──────────────
 
@@ -20,6 +21,9 @@ function fromDB(row) {
     leadId:           row.lead_id,
     responsavelNome:  row.responsavel_nome  ?? '',
     responsavelEmail: row.responsavel_email ?? '',
+    googleEventId:    row.google_event_id   ?? null,
+    meetLink:         row.meet_link         ?? null,
+    syncStatus:       row.sync_status       ?? null,
     createdAt:        row.created_at,
     updatedAt:        row.updated_at,
   }
@@ -70,7 +74,9 @@ export async function createEvento(evento) {
 
   if (error) throw error
   notifyAdmins({ type: 'agenda', content: `Novo evento: ${evento.titulo}`, link: '/agenda', excludeUserId: user.id })
-  return fromDB(data)
+  const eventoMapped = fromDB(data)
+  syncEventoGoogleCalendar(eventoMapped) // fire-and-forget: não bloqueia o fluxo
+  return eventoMapped
 }
 
 export async function updateEvento(id, evento) {

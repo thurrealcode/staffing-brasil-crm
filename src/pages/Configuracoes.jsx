@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { getGoogleAuthUrl, checkGoogleIntegration, disconnectGoogleCalendar } from '../lib/googleCalendarService'
 
 const MENU_ITEMS = [
   { id: 'perfil', label: 'Meu Perfil', icon: User },
@@ -412,38 +413,144 @@ function SecaoUsuarios({ user: currentUser }) {
 }
 
 function SecaoIntegracoes() {
-  const [status, setStatus] = useState(
-    Object.fromEntries(INTEGRACOES.map(i => [i.id, i.conectado]))
+  const [mockStatus, setMockStatus] = useState(
+    Object.fromEntries(INTEGRACOES.filter(i => i.id !== 'calendar').map(i => [i.id, i.conectado]))
   )
+  const [googleInfo, setGoogleInfo]         = useState(null)   // { google_email, ... } | null
+  const [googleLoading, setGoogleLoading]   = useState(true)
+  const [googleWorking, setGoogleWorking]   = useState(false)
+  const [googleFeedback, setGoogleFeedback] = useState(null)   // 'connected' | 'error' | null
+
+  // Verifica conexão Google ao montar
+  useEffect(() => {
+    checkGoogleIntegration()
+      .then(info => setGoogleInfo(info))
+      .finally(() => setGoogleLoading(false))
+
+    // Lê resultado do callback OAuth na URL
+    const params = new URLSearchParams(window.location.search)
+    const g = params.get('google')
+    if (g === 'connected') {
+      setGoogleFeedback('connected')
+      checkGoogleIntegration().then(setGoogleInfo)
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (g === 'error') {
+      setGoogleFeedback('error')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  const handleConnectGoogle = async () => {
+    setGoogleWorking(true)
+    try {
+      const url = await getGoogleAuthUrl()
+      window.location.href = url
+    } catch {
+      setGoogleFeedback('error')
+      setGoogleWorking(false)
+    }
+  }
+
+  const handleDisconnectGoogle = async () => {
+    if (!window.confirm('Desconectar Google Calendar? Novos eventos não serão mais sincronizados.')) return
+    setGoogleWorking(true)
+    try {
+      await disconnectGoogleCalendar()
+      setGoogleInfo(null)
+      setGoogleFeedback(null)
+    } catch {
+      setGoogleFeedback('error')
+    } finally {
+      setGoogleWorking(false)
+    }
+  }
 
   return (
     <div>
       <SectionTitle title="Integrações" subtitle="Conecte o CRM com outras ferramentas que você usa" />
+
+      {/* Feedback Google */}
+      {googleFeedback === 'connected' && (
+        <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 10, padding: '10px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Check size={14} style={{ color: '#22c55e', flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: '#22c55e', fontWeight: 600 }}>Google Calendar conectado com sucesso!</span>
+        </div>
+      )}
+      {googleFeedback === 'error' && (
+        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '10px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: '#ef4444' }}>Erro ao conectar. Tente novamente.</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {INTEGRACOES.map(integ => (
-          <div key={integ.id} style={{ background: '#18181b', border: `1px solid ${status[integ.id] ? 'rgba(34,197,94,0.15)' : '#27272a'}`, borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, transition: 'border-color 0.2s' }}>
-            <div style={{ width: 42, height: 42, borderRadius: 10, background: `${integ.color}22`, border: `1px solid ${integ.color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Plug size={18} style={{ color: integ.color }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#fafafa', marginBottom: 2 }}>{integ.nome}</div>
-              <div style={{ fontSize: 12, color: '#52525b' }}>{integ.desc}</div>
-            </div>
-            {status[integ.id] ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 6, padding: '3px 9px' }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
-                  <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>Conectado</span>
+        {INTEGRACOES.map(integ => {
+          // Google Calendar — real
+          if (integ.id === 'calendar') {
+            const conectado = !!googleInfo
+            return (
+              <div key={integ.id} style={{ background: '#18181b', border: `1px solid ${conectado ? 'rgba(34,197,94,0.15)' : '#27272a'}`, borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, transition: 'border-color 0.2s' }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: `${integ.color}22`, border: `1px solid ${integ.color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Plug size={18} style={{ color: integ.color }} />
                 </div>
-                <button onClick={() => setStatus(s => ({ ...s, [integ.id]: false }))}
-                  className="btn-secondary" style={{ fontSize: 12, padding: '5px 12px' }}>Desconectar</button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#fafafa', marginBottom: 2 }}>{integ.nome}</div>
+                  <div style={{ fontSize: 12, color: '#52525b' }}>
+                    {googleLoading ? 'Verificando...' : conectado
+                      ? `Conectado como ${googleInfo.google_email} · eventos sincronizados com Google Meet`
+                      : integ.desc}
+                  </div>
+                </div>
+                {googleLoading ? (
+                  <RefreshCw size={14} style={{ color: '#52525b', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                ) : conectado ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 6, padding: '3px 9px' }}>
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                      <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>Conectado</span>
+                    </div>
+                    <button onClick={handleDisconnectGoogle} disabled={googleWorking}
+                      className="btn-secondary" style={{ fontSize: 12, padding: '5px 12px', opacity: googleWorking ? 0.6 : 1 }}>
+                      Desconectar
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={handleConnectGoogle} disabled={googleWorking}
+                    className="btn-primary" style={{ fontSize: 12, padding: '7px 14px', opacity: googleWorking ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {googleWorking ? <><RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> Aguarde...</> : 'Conectar'}
+                  </button>
+                )}
               </div>
-            ) : (
-              <button onClick={() => setStatus(s => ({ ...s, [integ.id]: true }))}
-                className="btn-primary" style={{ fontSize: 12, padding: '7px 14px' }}>Conectar</button>
-            )}
-          </div>
-        ))}
+            )
+          }
+
+          // Demais integrações (mock)
+          const on = mockStatus[integ.id]
+          return (
+            <div key={integ.id} style={{ background: '#18181b', border: `1px solid ${on ? 'rgba(34,197,94,0.15)' : '#27272a'}`, borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, transition: 'border-color 0.2s' }}>
+              <div style={{ width: 42, height: 42, borderRadius: 10, background: `${integ.color}22`, border: `1px solid ${integ.color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Plug size={18} style={{ color: integ.color }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#fafafa', marginBottom: 2 }}>{integ.nome}</div>
+                <div style={{ fontSize: 12, color: '#52525b' }}>{integ.desc}</div>
+              </div>
+              {on ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 6, padding: '3px 9px' }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                    <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>Conectado</span>
+                  </div>
+                  <button onClick={() => setMockStatus(s => ({ ...s, [integ.id]: false }))}
+                    className="btn-secondary" style={{ fontSize: 12, padding: '5px 12px' }}>Desconectar</button>
+                </div>
+              ) : (
+                <button onClick={() => setMockStatus(s => ({ ...s, [integ.id]: true }))}
+                  className="btn-primary" style={{ fontSize: 12, padding: '7px 14px' }}>Conectar</button>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
