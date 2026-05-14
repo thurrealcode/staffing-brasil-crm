@@ -20,9 +20,9 @@ const NAV_SECTIONS = [
     items: [
       { to: '/prospeccao', icon: PhoneCall,   label: 'Prospecção', roles: ['admin', 'comercial'] },
       { to: '/leads',      icon: Users,        label: 'Leads',      roles: ['admin', 'comercial'] },
-      { to: '/empresas',   icon: Building2,    label: 'Empresas',   roles: ['admin'] },
+      { to: '/empresas',   icon: Building2,    label: 'Empresas',   roles: ['admin', 'comercial'] },
       { to: '/pipeline',   icon: GitBranch,    label: 'Pipeline',   roles: ['admin', 'comercial'] },
-      { to: '/contratos',  icon: FileText,     label: 'Contratos',  roles: ['admin', 'comercial'] },
+      { to: '/contratos',  icon: FileText,     label: 'Contratos',  roles: ['admin'] },
     ]
   },
   {
