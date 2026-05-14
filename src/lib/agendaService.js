@@ -7,6 +7,7 @@ import { syncEventoGoogleCalendar, deleteEventoGoogleCalendar } from './googleCa
 function fromDB(row) {
   return {
     id:               row.id,
+    userId:           row.user_id,
     titulo:           row.titulo,
     tipo:             row.tipo,
     data:             row.data,

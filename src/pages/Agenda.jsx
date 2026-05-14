@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Building2, User, MapP
 import { fetchAgenda, createEvento, updateEvento, deleteEvento, getEmailFromEvento } from '../lib/agendaService'
 import { registrarCancelamento } from '../lib/cancelamentosService'
 import CancelamentoModal from '../components/CancelamentoModal'
+import { useAuth } from '../context/AuthContext'
 
 const TIPO_CONFIG = {
   'Reunião':            { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)' },
@@ -156,8 +157,11 @@ function EventoFormModal({ initial, defaultDate, onClose, onSave, saving }) {
 // ── Página principal ──────────────────────────────────────────
 
 export default function Agenda() {
+  const { user } = useAuth()
   const today = todayStr()
   const nowDate = new Date()
+
+  const canEdit = (event) => user?.role === 'admin' || event.userId === user?.id
 
   const [eventos,      setEventos]      = useState([])
   const [loading,      setLoading]      = useState(true)
@@ -467,18 +471,20 @@ export default function Agenda() {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button onClick={() => openEdit(event)}
-                      style={{ flex: 1, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', padding: '8px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                      <Pencil size={12} /> Editar
-                    </button>
-                    <button onClick={() => handleDelete(event)} disabled={isDeleting}
-                      style={{ flex: 1, background: '#f8f9fa', border: '1px solid #e4e4e7', color: '#64748b', padding: '8px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: isDeleting ? 0.5 : 1 }}>
-                      {isDeleting
-                        ? <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> Excluindo...</>
-                        : <><Trash2 size={12} /> Excluir</>}
-                    </button>
-                  </div>
+                  {canEdit(event) && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button onClick={() => openEdit(event)}
+                        style={{ flex: 1, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', padding: '8px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <Pencil size={12} /> Editar
+                      </button>
+                      <button onClick={() => handleDelete(event)} disabled={isDeleting}
+                        style={{ flex: 1, background: '#f8f9fa', border: '1px solid #e4e4e7', color: '#64748b', padding: '8px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: isDeleting ? 0.5 : 1 }}>
+                        {isDeleting
+                          ? <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> Excluindo...</>
+                          : <><Trash2 size={12} /> Excluir</>}
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               )
             })
