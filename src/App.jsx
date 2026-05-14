@@ -14,6 +14,8 @@ import Relatorios from './pages/Relatorios'
 import Configuracoes from './pages/Configuracoes'
 import IA from './pages/IA'
 import Prospeccao from './pages/Prospeccao'
+import Showcase from './pages/Showcase'
+import Contratos from './pages/Contratos'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -39,7 +41,8 @@ function AppRoutes() {
   const { user } = useAuth()
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/login"    element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/showcase" element={<Showcase />} />
       <Route path="/" element={<PrivateRoute><AppLayout /></PrivateRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard"     element={<RoleRoute page="dashboard">    <Dashboard />    </RoleRoute>} />
@@ -53,6 +56,7 @@ function AppRoutes() {
         <Route path="relatorios"    element={<RoleRoute page="relatorios">   <Relatorios />   </RoleRoute>} />
         <Route path="ia"            element={<RoleRoute page="ia">           <IA />           </RoleRoute>} />
         <Route path="configuracoes" element={<RoleRoute page="configuracoes"><Configuracoes /></RoleRoute>} />
+        <Route path="contratos"     element={<RoleRoute page="contratos">    <Contratos />    </RoleRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

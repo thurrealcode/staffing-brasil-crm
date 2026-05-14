@@ -5,7 +5,7 @@ import { ROLE_LABELS } from '../lib/permissions'
 import {
   LayoutDashboard, Users, Building2, UserCheck, GitBranch,
   Calendar, MessageSquare, BarChart3, Settings,
-  Sparkles, ChevronLeft, ChevronRight, LogOut, PhoneCall
+  Sparkles, ChevronLeft, ChevronRight, LogOut, PhoneCall, FileText
 } from 'lucide-react'
 
 const NAV_SECTIONS = [
@@ -22,6 +22,7 @@ const NAV_SECTIONS = [
       { to: '/leads',      icon: Users,        label: 'Leads',      roles: ['admin', 'comercial'] },
       { to: '/empresas',   icon: Building2,    label: 'Empresas',   roles: ['admin'] },
       { to: '/pipeline',   icon: GitBranch,    label: 'Pipeline',   roles: ['admin', 'comercial'] },
+      { to: '/contratos',  icon: FileText,     label: 'Contratos',  roles: ['admin', 'comercial'] },
     ]
   },
   {

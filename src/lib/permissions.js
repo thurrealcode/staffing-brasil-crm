@@ -1,7 +1,7 @@
 // Páginas permitidas por role
 export const ROLE_PAGES = {
-  admin:        new Set(['dashboard','prospeccao','leads','empresas','pipeline','candidatos','agenda','mensagens','relatorios','ia','configuracoes']),
-  comercial:    new Set(['dashboard','prospeccao','leads','pipeline','mensagens','ia','configuracoes']),
+  admin:        new Set(['dashboard','prospeccao','leads','empresas','pipeline','candidatos','agenda','mensagens','relatorios','ia','configuracoes','contratos']),
+  comercial:    new Set(['dashboard','prospeccao','leads','pipeline','mensagens','ia','configuracoes','contratos']),
   recrutamento: new Set(['dashboard','candidatos','agenda','mensagens','ia','configuracoes']),
 }
 

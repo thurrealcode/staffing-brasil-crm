@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   User, Lock, Bell, Palette, Globe, Users, Shield, Plug, Trash2,
-  Check, Eye, EyeOff, ChevronRight, Building2, Mail, Phone, MapPin, Save
+  Check, Eye, EyeOff, ChevronRight, Building2, Mail, Phone, MapPin, Save,
+  RefreshCw, AlertCircle
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 
 const MENU_ITEMS = [
   { id: 'perfil', label: 'Meu Perfil', icon: User },
@@ -17,11 +19,19 @@ const MENU_ITEMS = [
   { id: 'privacidade', label: 'Privacidade & LGPD', icon: Shield },
 ]
 
-const USUARIOS_MOCK = [
-  { id: 1, nome: 'Staffing Excellence', email: 'staffingexcellence.comercial@gmail.com', role: 'Administrador', avatar: 'SE', ativo: true },
-  { id: 2, nome: 'Admin Staffing', email: 'admin@staffingbrasil.com.br', role: 'Administrador', avatar: 'AS', ativo: true },
-  { id: 3, nome: 'Equipe Comercial', email: 'comercial@staffingbrasil.com.br', role: 'Consultor', avatar: 'EC', ativo: true },
+const ROLE_OPTIONS = [
+  { value: 'admin',        label: 'Administrador' },
+  { value: 'comercial',    label: 'Comercial'     },
+  { value: 'recrutamento', label: 'Recrutamento'  },
 ]
+
+function roleLabel(role) {
+  return ROLE_OPTIONS.find(r => r.value === role)?.label || role
+}
+
+function avatarFromNome(nome) {
+  return (nome || '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+}
 
 const INTEGRACOES = [
   { id: 'whatsapp', nome: 'WhatsApp Business', desc: 'Envie mensagens direto do CRM', conectado: true, color: '#22c55e' },
@@ -247,40 +257,156 @@ function SecaoEmpresa() {
   )
 }
 
-function SecaoUsuarios() {
-  const ROLES = ['Administrador', 'Consultor', 'Visualizador']
+function SecaoUsuarios({ user: currentUser }) {
+  const [usuarios, setUsuarios] = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [erro, setErro]         = useState(null)
+  const [salvando, setSalvando] = useState({})
+  const [feedback, setFeedback] = useState({})
+
+  const carregar = async () => {
+    setLoading(true)
+    setErro(null)
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('user_id, nome, email, role, created_at')
+      .order('nome')
+    if (error) setErro(error.message)
+    else setUsuarios(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { carregar() }, [])
+
+  const trocarRole = async (userId, novoRole) => {
+    setSalvando(s => ({ ...s, [userId]: true }))
+    setFeedback(f => ({ ...f, [userId]: null }))
+    const { error } = await supabase.rpc('set_user_role', {
+      target_user_id: userId,
+      new_role: novoRole,
+    })
+    if (error) {
+      setFeedback(f => ({ ...f, [userId]: 'erro' }))
+      alert('Erro ao atualizar: ' + error.message)
+    } else {
+      setUsuarios(prev => prev.map(u => u.user_id === userId ? { ...u, role: novoRole } : u))
+      setFeedback(f => ({ ...f, [userId]: 'ok' }))
+      setTimeout(() => setFeedback(f => ({ ...f, [userId]: null })), 2000)
+    }
+    setSalvando(s => ({ ...s, [userId]: false }))
+  }
+
+  const isAdmin = currentUser?.role === 'admin'
+
   return (
     <div>
-      <SectionTitle title="Usuários" subtitle="Gerencie quem tem acesso ao CRM" />
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <button className="btn-primary" style={{ fontSize: 13 }}>+ Convidar usuário</button>
+      <SectionTitle title="Usuários" subtitle="Gerencie quem tem acesso ao CRM e seus níveis de permissão" />
+
+      {/* Legenda de roles */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        {ROLE_OPTIONS.map(r => {
+          const colors = {
+            admin:        { color: '#ef4444', bg: 'rgba(239,68,68,0.08)',    border: 'rgba(239,68,68,0.2)'    },
+            comercial:    { color: '#3b82f6', bg: 'rgba(59,130,246,0.08)',   border: 'rgba(59,130,246,0.2)'   },
+            recrutamento: { color: '#a855f7', bg: 'rgba(168,85,247,0.08)',   border: 'rgba(168,85,247,0.2)'   },
+          }
+          const c = colors[r.value]
+          return (
+            <div key={r.value} style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 8, padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.color }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: c.color }}>{r.label}</span>
+            </div>
+          )
+        })}
+        <button onClick={carregar} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid #27272a', color: '#52525b', padding: '5px 10px', borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontFamily: 'inherit' }}>
+          <RefreshCw size={11} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Atualizar
+        </button>
       </div>
+
+      {erro && (
+        <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: '#dc2626' }}>{erro}</span>
+        </div>
+      )}
+
       <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 12, overflow: 'hidden' }}>
-        {USUARIOS_MOCK.map((u, i) => (
-          <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: i < USUARIOS_MOCK.length - 1 ? '1px solid #1c1c20' : 'none' }}>
-            <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#ef4444' }}>{u.avatar}</span>
+        {loading ? (
+          [...Array(3)].map((_, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: i < 2 ? '1px solid #1c1c20' : 'none' }}>
+              <div className="skeleton" style={{ width: 38, height: 38, borderRadius: '50%' }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="skeleton" style={{ width: 140, height: 13, borderRadius: 4 }} />
+                <div className="skeleton" style={{ width: 200, height: 11, borderRadius: 4 }} />
+              </div>
+              <div className="skeleton" style={{ width: 120, height: 30, borderRadius: 7 }} />
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#fafafa' }}>{u.nome}</div>
-              <div style={{ fontSize: 12, color: '#52525b' }}>{u.email}</div>
-            </div>
-            <select defaultValue={u.role}
-              style={{ background: '#111113', border: '1px solid #27272a', color: '#a1a1aa', padding: '5px 10px', borderRadius: 7, fontSize: 12, outline: 'none', fontFamily: 'inherit', cursor: 'pointer' }}>
-              {ROLES.map(r => <option key={r} style={{ background: '#18181b' }}>{r}</option>)}
-            </select>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: u.ativo ? '#22c55e' : '#52525b' }} />
-              <span style={{ fontSize: 11, color: u.ativo ? '#22c55e' : '#52525b' }}>{u.ativo ? 'Ativo' : 'Inativo'}</span>
-            </div>
-            <button style={{ width: 30, height: 30, background: 'transparent', border: '1px solid #27272a', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#52525b', transition: 'all 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)' }}
-              onMouseLeave={e => { e.currentTarget.style.color = '#52525b'; e.currentTarget.style.borderColor = '#27272a' }}>
-              <Trash2 size={12} />
-            </button>
+          ))
+        ) : usuarios.length === 0 ? (
+          <div style={{ padding: '32px 20px', textAlign: 'center', color: '#52525b', fontSize: 13 }}>
+            Nenhum usuário encontrado. Execute o SQL de criação da tabela profiles.
           </div>
-        ))}
+        ) : (
+          usuarios.map((u, i) => {
+            const isSelf    = u.user_id === currentUser?.id
+            const roleColor = {
+              admin:        '#ef4444',
+              comercial:    '#3b82f6',
+              recrutamento: '#a855f7',
+            }[u.role] || '#71717a'
+
+            return (
+              <div key={u.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: i < usuarios.length - 1 ? '1px solid #1c1c20' : 'none', transition: 'background 0.12s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.015)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                {/* Avatar */}
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: `${roleColor}18`, border: `1px solid ${roleColor}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: roleColor }}>{avatarFromNome(u.nome)}</span>
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#fafafa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.nome}</span>
+                    {isSelf && <span style={{ fontSize: 10, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 4, padding: '1px 6px', fontWeight: 600, flexShrink: 0 }}>você</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#52525b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
+                </div>
+
+                {/* Role selector */}
+                {isAdmin && !isSelf ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <select
+                      value={u.role}
+                      disabled={!!salvando[u.user_id]}
+                      onChange={e => trocarRole(u.user_id, e.target.value)}
+                      style={{ background: '#111113', border: `1px solid ${roleColor}44`, color: roleColor, padding: '6px 10px', borderRadius: 7, fontSize: 12, outline: 'none', fontFamily: 'inherit', cursor: 'pointer', fontWeight: 600, opacity: salvando[u.user_id] ? 0.5 : 1 }}
+                    >
+                      {ROLE_OPTIONS.map(r => (
+                        <option key={r.value} value={r.value} style={{ background: '#18181b', color: '#fafafa' }}>{r.label}</option>
+                      ))}
+                    </select>
+                    {salvando[u.user_id] && <RefreshCw size={13} style={{ color: '#52525b', animation: 'spin 1s linear infinite', flexShrink: 0 }} />}
+                    {feedback[u.user_id] === 'ok' && <Check size={14} style={{ color: '#22c55e', flexShrink: 0 }} />}
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: roleColor, background: `${roleColor}12`, border: `1px solid ${roleColor}30`, padding: '4px 10px', borderRadius: 7 }}>
+                    {roleLabel(u.role)}
+                  </span>
+                )}
+              </div>
+            )
+          })
+        )}
       </div>
+
+      {!isAdmin && (
+        <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Shield size={13} style={{ color: '#f59e0b', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: '#71717a' }}>Somente administradores podem alterar roles de outros usuários.</span>
+        </div>
+      )}
     </div>
   )
 }
